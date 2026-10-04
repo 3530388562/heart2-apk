@@ -1372,6 +1372,26 @@
           }
           continue;
         }
+        if (reforming) {   // 重聚（飞行归位）期间：用廉价发光球贴图替代华丽彩带（省11段贝塞尔+旋转），成型后恢复
+          const R = p._sz * 1.8;
+          if (spd > 0.08) {
+            const ang = Math.atan2(p._dy, p._dx), ca = Math.cos(ang), sa = Math.sin(ang);
+            const tl = Math.min(spd * 8, 170), hw = R * 0.5, tw = hw * 0.22, nx = -sa, ny = ca;
+            const txx = p._sx - ca * tl, tyy = p._sy - sa * tl;
+            ctx.fillStyle = `rgba(${cl(p.r)},${cl(p.g)},${cl(p.b)},${p._a * 0.55})`;
+            ctx.beginPath();
+            ctx.moveTo(p._sx + nx * hw, p._sy + ny * hw);
+            ctx.lineTo(txx + nx * tw, tyy + ny * tw);
+            ctx.lineTo(txx - nx * tw, tyy - ny * tw);
+            ctx.lineTo(p._sx - nx * hw, p._sy - ny * hw);
+            ctx.closePath(); ctx.fill();
+          }
+          const band = (p.hy - HY_TOP) / (HY_BOT - HY_TOP) * (SPHERE_BANDS - 1);
+          const sp2 = sphereSprites[band < 0 ? 0 : (band > SPHERE_BANDS - 1 ? SPHERE_BANDS - 1 : band | 0)];
+          if (sp2) ctx.drawImage(sp2, p._sx - R, p._sy - R, R * 2, R * 2);
+          else { ctx.fillStyle = `rgba(${cl(p.r)},${cl(p.g)},${cl(p.b)},${p._a * 0.72})`; ctx.beginPath(); ctx.arc(p._sx, p._sy, R * 0.62, 0, 6.283); ctx.fill(); }
+          continue;
+        }
         const s = p._sz * 2.6;   // 飞行归位：球略大，保留丝绸彩带质感
         {
           // ---- 飞行中：颜色加重的大球 + 彩带拖尾 ----
@@ -1891,7 +1911,7 @@
   //   改 setTimeout 后：每次 send 完成才排下一帧 + 间隔 70ms（≈14fps），低分辨率下单帧推理仅 ~10ms，主线程占用大幅降低；
   //   手势是慢变化姿态，14fps 足够，响应延迟仅增约百 ms（人眼无感），不影响灵敏度阈值。
   const HAND_INTERVAL = 70;                              // 两次识别最小间隔(ms) ≈ 14fps（常态，保流畅度红线）
-  const HAND_INTERVAL_FAST = 35;                         // 已握拳后加速到 ≈28fps，开辟「快速识别张开」临时通道
+  const HAND_INTERVAL_FAST = 28;                         // 已握拳后加速到 ≈36fps，开辟「快速识别张开」临时通道
   function handSendLoop() {
     if (!handEnabled || !hands || !handVideo) { handTimer = null; return; }
     if (handCool > 0) { handCool--; handTimer = setTimeout(handSendLoop, 16); return; }   // 冷却期短间隔空转
