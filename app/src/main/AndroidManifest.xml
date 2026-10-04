@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 摄像头权限：手势「握拳→张开」识别必需 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- 联网：MediaPipe 的 WASM/模型从 jsdelivr CDN 加载 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- 摄像头不是安装硬门槛：无摄像头的设备也能装，只是手势不可用（网页已有兜底提示） -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:icon="@android:drawable/ic_menu_gallery"
+        android:hardwareAccelerated="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

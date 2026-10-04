@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>粒子爱心（抖音同款）</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000;
+    touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #panel { position: fixed; left: 12px; top: 12px; z-index: 10; display: flex; flex-wrap: wrap; gap: 8px; max-width: 96vw; }
+  #panel button {
+    font: 13px/1 -apple-system, system-ui, "PingFang SC", sans-serif; color: #fff;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+    padding: 9px 14px; border-radius: 20px; cursor: pointer;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); transition: background .15s;
+  }
+  #panel button.on { background: rgba(255,120,170,0.88); border-color: rgba(255,150,190,0.95); }
+  /* 下拉按钮（形成方式 / 重聚背景 / 动作）：点击展开子按钮 */
+  #panel .dropdown { position: relative; display: inline-block; }
+  #panel .dropbtn {
+    font: 13px/1 -apple-system, system-ui, "PingFang SC", sans-serif; color: #fff;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+    padding: 9px 14px; border-radius: 20px; cursor: pointer;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); transition: background .15s;
+  }
+  #panel .dropdown.open .dropbtn { background: rgba(255,120,170,0.88); border-color: rgba(255,150,190,0.95); }
+  #panel .menu {
+    position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; display: none;
+    flex-direction: column; gap: 6px; padding: 8px; min-width: 134px;
+    border-radius: 16px; background: rgba(22,14,22,0.92);
+    border: 1px solid rgba(255,255,255,0.22);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    box-shadow: 0 8px 28px rgba(0,0,0,.5);
+  }
+  #panel .dropdown.open .menu { display: flex; }
+  #panel .menu button {
+    font: 13px/1 -apple-system, system-ui, "PingFang SC", sans-serif; color: #fff;
+    background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22);
+    padding: 9px 14px; border-radius: 14px; cursor: pointer; text-align: left;
+    white-space: nowrap; transition: background .15s;
+  }
+  #panel .menu button.on { background: rgba(255,120,170,0.88); border-color: rgba(255,150,190,0.95); }
+  /* 菜单内分隔线：区分「粒子样式」与「形状」两组选项 */
+  #panel .menu .divider { height: 1px; margin: 2px 0; background: rgba(255,255,255,0.22); }
+  /* 颜色调节器：位于顶部按钮行内「动作」按钮右侧，随面板排版流动（不再固定定位，永不遮挡按钮） */
+  #colorbox { display: flex; align-items: center; gap: 10px;
+    font: 13px/1 -apple-system, system-ui, "PingFang SC", sans-serif; color: #fff;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+    padding: 8px 12px; border-radius: 16px;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  #colorbox label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  #colorbox input[type="color"] { width: 30px; height: 24px; padding: 0; border: 1px solid rgba(255,255,255,.35);
+    border-radius: 6px; background: none; cursor: pointer; }
+  /* 「纯色」开关：未选中=中性，选中=粉色高亮（与其余按钮一致的高亮约定） */
+  #colorbox .apply { background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.30); color: #fff;
+    padding: 6px 12px; border-radius: 14px; cursor: pointer; font: inherit; transition: background .15s; }
+  #colorbox .apply.on { background: rgba(255,120,170,0.88); border-color: rgba(255,150,190,0.95); }
+  /* 纯色模式：只显示「纯色」色盘；渐变模式：只显示「顶部/底部」色盘 */
+  #colorbox.solid .grad { display: none; }
+  #solidLab { display: none; }
+  #colorbox.solid #solidLab { display: flex; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="panel">
+  <div class="dropdown" id="ddForm">
+    <button class="dropbtn">形成方式 ▾</button>
+    <div class="menu">
+      <button data-m="notch" class="on">中间向俩侧</button>
+      <button data-m="bottom">自下而上</button>
+    </div>
+  </div>
+  <div class="dropdown" id="ddStyle">
+    <button class="dropbtn">外观 ▾</button>
+    <div class="menu">
+      <button data-style="grain" class="on">颗粒粒子</button>
+      <button data-style="sphere">球型粒子</button>
+      <div class="divider"></div>
+      <button data-s="origin" class="on">原版形状</button>
+      <button data-s="balance">均衡饱满</button>
+    </div>
+  </div>
+  <div class="dropdown" id="ddSand">
+    <button class="dropbtn">重聚背景 ▾</button>
+    <div class="menu">
+      <button data-sand="rotate">细沙方粒</button>
+      <button data-sand="sphere" class="on">粒子球体</button>
+      <div class="divider"></div>
+      <button data-star="0" class="on">银芒</button>
+      <button data-star="1">银星</button>
+      <button data-star="2">银钻</button>
+      <button data-star="3">银流星</button>
+      <button data-star="off">关闭</button>
+    </div>
+  </div>
+  <div class="dropdown" id="ddPose">
+    <button class="dropbtn">动作 ▾</button>
+    <div class="menu">
+      <button data-pose="front" class="on">爱心正面</button>
+      <button data-pose="spin">爱心自转</button>
+      <button data-pose="sway">爱心摆动</button>
+      <button data-b="beat">跳动</button>
+    </div>
+  </div>
+  <button id="gestureBtn">手势</button>
+  <!-- 颜色调节器：紧跟在「动作」按钮右侧（同一行内流动排版） -->
+  <div id="colorbox">
+    <label class="grad">顶部<input type="color" id="colTop" value="#ffffff"></label>
+    <label class="grad">底部<input type="color" id="colBot" value="#ff4b8c"></label>
+    <label id="solidLab">纯色<input type="color" id="colSolid" value="#ff4b8c"></label>
+    <button class="apply" id="solidBtn">纯色</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  let W, H, CX, CY, S, DPR;
+
+  // 流星雨离屏层：透明底，每帧清空后绘制流星+闪星，再合成到主画布（不影响爱心拖尾、不留残影）
+  const meteorCanvas = document.createElement('canvas');
+  const mctx = meteorCanvas.getContext('2d');
+  function resize() {
+    // 按设备像素比放大画布：高清屏（手机 DPR 2~3）上粒子才是锐利的，不再糊成一团
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    meteorCanvas.width = W; meteorCanvas.height = H;   // 逻辑像素（不乘 DPR）：流星细线略糊可接受，省算力
+    CX = W / 2;
+    CY = H / 2 - H * 0.02;
+    S = Math.min(W, H) * 0.0195;  // 心形占屏约 63~68%（整体放大；粒子数量同步增加，不靠放大半径）
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ---------- 心形曲线 ---------- */
+  const FAT = 1.15;                              // 横向加宽系数
+  const STRETCH_Y = 1.08;                        // 纵向拉伸系数：上下轻微拉长（只拉高，横向不变）
+  function heartX(t) { return FAT * 16 * Math.pow(Math.sin(t), 3); }
+  function heartY(t) { return -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * STRETCH_Y; }
+  // 轮廓多边形：内部采样与切割判定都用它，和外形严格一致
+  const POLY = [];
+  for (let i = 0; i < 160; i++) {
+    const t = i / 160 * Math.PI * 2;
+    POLY.push([heartX(t), heartY(t)]);
+  }
+  function insideHeart(x, y) {                   // 射线法判内
+    let inside = false;
+    for (let i = 0, j = POLY.length - 1; i < POLY.length; j = i++) {
+      const xi = POLY[i][0], yi = POLY[i][1], xj = POLY[j][0], yj = POLY[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  // 到轮廓的最短距离：内部采样靠它做「越贴边越密」的指数衰减
+  function edgeDist(x, y) {
+    let m = Infinity;
+    for (let i = 0, n = POLY.length; i < n; i++) {
+      const a = POLY[i], b = POLY[(i + 1) % n];
+      const ex = b[0] - a[0], ey = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / (ex * ex + ey * ey)));
+      const px = a[0] + t * ex - x, py = a[1] + t * ey - y;
+      const d2 = px * px + py * py;
+      if (d2 < m) m = d2;
+    }
+    return Math.sqrt(m);
+  }
+  // 各高度的轮廓半宽：把中轴退化点挂到「同高度侧边」的扫掠序用（避免尾巴中心早于俩侧成簇）
+  // —— y 范围随纵向拉伸同步：从心形最低点(-13*STRETCH_Y)到最高点(20*STRETCH_Y)，保证查表覆盖全形
+  const _HW_Y0 = -13 * STRETCH_Y, _HW_STEP = 0.2 * STRETCH_Y;
+  const _HW = [];
+  for (let k = 0; k <= 165; k++) {
+    const y = _HW_Y0 + k * _HW_STEP;
+    let hw = 0;
+    for (let i = 0, n = POLY.length; i < n; i++) {
+      const a = POLY[i], b = POLY[(i + 1) % n];
+      if ((a[1] > y) !== (b[1] > y)) {
+        const xx = a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]);
+        if (Math.abs(xx) > hw) hw = Math.abs(xx);
+      }
+    }
+    _HW.push(hw);
+  }
+  function halfWidth(y) {
+    const f = (y - _HW_Y0) / _HW_STEP;
+    if (f <= 0) return _HW[0];
+    if (f >= _HW.length - 1) return _HW[_HW.length - 1];
+    const i = Math.floor(f);
+    const t = f - i;
+    return _HW[i] * (1 - t) + _HW[i + 1] * t;
+  }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  /* ---------- 凹口描边序：沿轮廓弧长从凹口(顶部中缝凹陷)起笔 ---------- */
+  // 以心形参数 t=0（顶部中轴的凹口）为弧长 0，沿 t 增大累计轮廓弧长；闭合周长 _PERIM、半周 _HALF。
+  // notchOrderT(t)：该轮廓点「距凹口的弧长（取两侧较短一侧）」归一化到 [0,1]，
+  //   0=凹口、1=尖底 —— 左右严格对称，两侧同时由凹口描到尖底（像两支笔从凹口向俩边画）。
+  const ARC_N = 900;
+  const _ARC = new Float32Array(ARC_N + 1);
+  {
+    let px = heartX(0), py = heartY(0);
+    for (let i = 1; i <= ARC_N; i++) {
+      const t = i / ARC_N * Math.PI * 2;
+      const x = heartX(t), y = heartY(t);
+      _ARC[i] = _ARC[i - 1] + Math.hypot(x - px, y - py);
+      px = x; py = y;
+    }
+  }
+  const _PERIM = _ARC[ARC_N], _HALF = _PERIM / 2;
+  function arcAtT(t) {
+    const f = (t / (Math.PI * 2)) * ARC_N;
+    const i = Math.floor(f);
+    if (i >= ARC_N) return _ARC[ARC_N];
+    const fr = f - i;
+    return _ARC[i] * (1 - fr) + _ARC[i + 1] * fr;
+  }
+  function notchOrderT(t) {
+    const L = arcAtT(((t % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2));
+    const s = Math.min(L, _PERIM - L);
+    return s / _HALF;
+  }
+  // 内部粒子（无轮廓参数）取「最近轮廓点」的凹口序（网格化采样快速查）
+  const _CS_N = 480, _CS = [];
+  for (let i = 0; i < _CS_N; i++) {
+    const t = i / _CS_N * Math.PI * 2;
+    _CS.push({ x: heartX(t), y: heartY(t), o: notchOrderT(t) });
+  }
+  let S_WAIST = 1;   // 上半段（hy<=TAIL_BEGIN）的最大凹口序，applyOrder 时刷新 → 把上半段归一到 [0, TS]
+
+  // 粒子效果（提前声明：sampleTarget 在下方顶层执行时就要读它，避免 TDZ）
+  //   'grain' =颗粒（原细沙方粒） | 'sphere' =球型（球体+彩带拖尾）
+  let PARTICLE_STYLE = 'grain';
+
+  // 形状预设：饱满度(inDepth) + 边缘离散度(bandIn/sprayOut)。'origin' 为默认（原版实边），'balance' 即均衡饱满
+  const PRESETS = {
+    origin:  { outlineFrac: 0.55, inDepth: 1.6, bandIn: 0.10, sprayOut: 0.22, sprayProb: 0.22, aBand: 0.85, aOut: [0.25, 0.5], aIn: 0.52 },
+    balance: { outlineFrac: 0.45, inDepth: 3.2, bandIn: 0.16, sprayOut: 0.07, sprayProb: 0.16, aBand: 0.84, aOut: [0.20, 0.40], aIn: 0.55 },
+  };
+  let SHAPE = 'origin';            // 当前生效的形状（默认原版：边缘实、内部空心）
+  let pendingShape = null;         // 待生效形状：切按钮只记它，下一次聚合（切割→复原）才套用
+  function sampleTarget(P) {
+    if (Math.random() < P.outlineFrac) {              // 轮廓：贴边尘带（向内铺开）+ 向外喷洒（决定边缘离散度）
+      const t = Math.random() * Math.PI * 2;
+      let d;
+      // 球型：外喷概率置 0 → 爱心外围不再有零散粒子，边缘干净（切回颗粒时按 sprayD 还原）
+      const sprayProb = (PARTICLE_STYLE === 'sphere') ? 0 : P.sprayProb;
+      if (Math.random() < sprayProb) d = 1 + Math.pow(Math.random(), 1.6) * P.sprayOut;  // 向外飘，越远越稀
+      else d = 1 - Math.pow(Math.random(), 1.5) * P.bandIn;                                  // 向内铺开，越贴边越密
+      const aMax = d > 1 ? rand(P.aOut[0], P.aOut[1]) : P.aBand;
+      return { hx: heartX(t) * d, hy: heartY(t) * d, outline: true, tp: t, aMax,
+        spray: d > 1, sprayD: d, sprayA: aMax };
+    }
+    // 内部：按「到边缘的距离」做指数衰减 —— inDepth 越大，中心越满（越饱满）
+    const IN_DEPTH = P.inDepth;
+    const HY_LO = -12 * STRETCH_Y, HY_HI = 17.5 * STRETCH_Y;   // 内部采样 y 范围随纵向拉伸同步
+    let hx, hy;
+    do { hx = rand(-19, 19); hy = rand(HY_LO, HY_HI); } while (!insideHeart(hx, hy));
+    for (let g = 0; g < 30; g++) {           // 拒绝采样：离边越远接受概率越低
+      if (Math.random() < Math.exp(-edgeDist(hx, hy) / IN_DEPTH)) break;
+      do { hx = rand(-19, 19); hy = rand(HY_LO, HY_HI); } while (!insideHeart(hx, hy));
+    }
+    return { hx, hy, outline: false, tp: 0, aMax: P.aIn, spray: false, sprayD: 1, sprayA: P.aIn };
+  }
+
+  // 散落态下切换粒子效果：同步切换「烟花 / 落地」模式。
+  // 切回颗粒时，飞出屏幕的碎片必须收回屏幕内并重新获得落脚点，否则它们会永远悬在屏幕外、底下一片空。
+  function applyScatterMode() {
+    if (!scattered) return;
+    const fw = (PARTICLE_STYLE === 'sphere');
+    for (const p of heart) {
+      if (fw) {
+        // 只把「还在飞」的转成烟花；已经躺在地上的碎片保持落地状态。
+        // 否则静止碎片会被当成「出屏定格」而跳过绘制 → 一地碎片凭空消失。
+        // 注意：落地后 vx 是极小的非零浮点（*=0.5 永远到不了 0），必须用阈值判断「还在飞」
+        if (Math.abs(p.vx) + Math.abs(p.vy) > 0.05) {
+          p.fw = true; p.floorY = Infinity;
+          p.fwUp = p.vy < 0;                 // 补上起爆方向标记（散落态切球型时补建的烟花）
+        } else {
+          p.fw = false;
+          if (!isFinite(p.floorY)) p.floorY = H - 3 - Math.pow(Math.random(), 1.5) * 15;
+        }
+      } else {
+        p.fw = false;
+        if (!isFinite(p.floorY)) p.floorY = H - 3 - Math.pow(Math.random(), 1.5) * 15;
+        // 夹回屏幕内（避免边界弹回把屏幕外的粒子瞬移到 x=3 / x=W-3）
+        if (p.x < 3 || p.x > W - 3) { p.x = Math.min(W - 3, Math.max(3, p.x)); p.vx = 0; }
+        if (p.y < 0 || p.y > H - 3) { p.y = Math.min(H - 3, Math.max(0, p.y)); p.vy = 0; }
+      }
+    }
+  }
+
+  // 把「爱心外围散粒子」收回边缘 / 还原到外喷位（切换粒子效果时即时生效，无需重新生成爱心）
+  // 球型：d→1（贴回心形曲线，亮度改用尘带的 aBand，与边缘粒子一致）
+  // 颗粒：按 sprayD / sprayA 还原成原来那颗稀疏的外飘粒子
+  function applySprayTargets() {
+    const P = PRESETS[SHAPE];
+    for (const p of heart) {
+      if (!p.spray) continue;
+      const d = (PARTICLE_STYLE === 'sphere') ? 1 : (p.sprayD || 1);
+      p.hx = heartX(p.tp) * d;
+      p.hy = heartY(p.tp) * d;
+      p.aMax = (PARTICLE_STYLE === 'sphere') ? P.aBand : (p.sprayA || P.aBand);
+      p.st = null;                       // 失效亮度缓存
+      const c = shapeColor(p.hy, p.idx); p.r = c.r; p.g = c.g; p.b = c.b;
+    }
+  }
+
+  function pinkStyle() {
+    // 极少暖白点缀（几乎可忽略），绝大多数用玫粉主色
+    if (Math.random() < 0.02) {
+      return { r: 255, g: 248, b: 250 };
+    }
+    // 主色：暖红粉（b 不高于 g，避免偏青蓝）
+    return { r: 255, g: 90 + (Math.random() * 70 | 0), b: 100 + (Math.random() * 50 | 0) };
+  }
+
+  /* ---------- 心跳节奏：咚-咚--- ---------- */
+  function heartbeat(t) {
+    const cycle = 1150;
+    const p = (t % cycle) / cycle;
+    const b1 = Math.exp(-Math.pow((p - 0.10) / 0.055, 2));
+    const b2 = Math.exp(-Math.pow((p - 0.28) / 0.065, 2)) * 0.7;
+    return Math.min(1, b1 + b2);
+  }
+
+  // 心跳迸发：从爱心轮廓沿径向向外喷出一小簇粒子（咚-哒两个脉冲各喷一次）
+  function beatBurst(scale) {
+    const ccx = CX + ox, ccy = CY + oy;
+    const n = 44;
+    for (let i = 0; i < n; i++) {
+      const t = Math.random() * Math.PI * 2;
+      const px = ccx + heartX(t) * scale;
+      const py = ccy + heartY(t) * scale;
+      const ang = Math.atan2(py - ccy, px - ccx) + rand(-0.45, 0.45);
+      const sp = rand(2.5, 6.5), c = pinkStyle();
+      sparks.push({ x: px, y: py, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 0.8,
+        life: 0, maxLife: rand(45, 95), size: rand(0.4, 1.1), r: c.r, g: c.g, b: c.b });
+    }
+  }
+
+  /* ---------- 粒子 ---------- */
+  const HEART_N = 13000;
+  const heart = [];
+  const sparks = [];       // 仅用于轻点迸发的一簇粒子
+  const stars = [];        // 烟花绽放时满屏点缀的银色星星（缓缓飘动 + 闪烁 + 淡出）
+  let starStyle = 0;       // 微星效果样式：0=银芒(四角尖星) | 1=银星(明亮核) | 2=银钻切面 | 3=银流星(带尾)
+  let starEnabled = true;  // 微星效果总开关：false 时切割不生成微星、已显示的立即清空
+
+  // 沙尘暴环绕（3D 立体）：切割→聚合过程中，一圈粒子在「椭球壳」上绕爱心盘旋，
+  //   带前后纵深 z（近大远小、近亮远暗），并按 z 分前后两批绘制 —— 后方被实心爱心遮住、前方的盖在爱心上，
+  //   形成「绕到爱心后面再转回来」的 3D 穿插。颜色与爱心一致（上白下粉）。
+  const sand = [];
+  let sandActive = false, sandFade = 0;   // 是否激活 / 可见度 0~1（聚合完成后淡出）
+  // 沙暴形态 / 爱心姿态：运行时可自由切换（左上角按钮）。默认「粒子球体 + 爱心正面不动」
+  let SAND_DEPTH = 'sphere';             // 'rotate'=细沙方粒（沙尘感）| 'sphere'=高光小球（有体积光影）
+  let sandSpin = 0;                      // 整体绕 Y 轴角（仅 spin 姿态递增，与沙暴同步自转）
+  let HEART_POSE = 'front';              // 'front'=正面不动 | 'spin'=跟随沙暴3D自转 | 'sway'=轻微摆动
+  let pendingPose = null;                // 自转中切到其它姿态的待生效目标：转到「正面」(最多半圈)后再应用
+  let pendingFront = 0;                  // 待生效切换的「目标正面角」：点击瞬间锁定，避免每帧重算导致永远差一圈
+  let spinAngle = 0;                     // 整体3D自转角（仅 spin 姿态累加）
+  const SPIN_TURN_SEC = 13;              // 自转一圈耗时（秒）
+  // 每帧转过的弧度：dt 以 60fps 为 1，故 一圈 = SPIN_TURN_SEC*60 帧 → 速度 = 2π/(13*60)
+  const SPIN_SPEED = Math.PI * 2 / (SPIN_TURN_SEC * 60);
+  function startSand() {
+    sandActive = true; sandFade = 1;
+    sand.length = 0;
+    const isSphere = PARTICLE_STYLE === 'sphere';   // 背景球调整仅作用于球型模式，颗粒模式保持原状
+    const N = isSphere ? 620 : 850;            // 3D 环绕沙暴粒子数：球型略减以降末段峰值，颗粒保持 850
+    const R0 = 18 * S;              // 基准半径 ≈ 心形横向半宽（S 为心形缩放系数）
+    for (let i = 0; i < N; i++) {
+      const az = Math.random() * Math.PI * 2;               // 水平方位角（绕心旋转）
+      const el = rand(-0.95, 0.95);                          // 极角（上下铺开，偏球状环绕）
+      const rad = rand(1.05, 1.9) + rand(-0.05, 0.05);       // 壳层半径（1.05~1.9 倍 R0）+ 微抖
+      const av = (Math.random() < 0.85 ? 1 : -1) * (isSphere ? rand(0.005, 0.015) : rand(0.008, 0.024));  // 球型平缓顺滑；颗粒保持原转速
+      const hy = rand(HY_TOP, HY_BOT);
+      const c = colorByHeight(hy);                           // 与爱心同色：上白下粉
+      sand.push({ az, el, rad, av, R0, r: rand(0.35, 1.05), wob: rand(0, 6.28), hy,
+                  z: 0, sx: 0, sy: 0, ss: 0, sa: 0, c });
+    }
+  }
+  // 每帧更新：绕心旋转 + 伪 3D 透视投影（近大远小、近亮远暗），缓存屏幕坐标供前后两批绘制
+  function updateSand(dt) {
+    const ccx = CX + ox, ccy = CY + oy;
+    const focal = 72 * S;            // 透视焦距：越大透视越平；全程 focal > |Z| 不会除零
+    for (const p of sand) {
+      p.az += p.av * dt;
+      p.wob += dt * 0.05;
+      p.el += Math.sin(p.wob * 0.3) * 0.0025 * dt;          // 极角轻飘，壳层有起伏
+      if (p.el > 1.35) p.el = 1.35; else if (p.el < -1.35) p.el = -1.35;
+      const radPx = p.R0 * p.rad;
+      const ce = Math.cos(p.el), se = Math.sin(p.el);
+      const ca = Math.cos(p.az), sa = Math.sin(p.az);
+      const X0 = radPx * ce * sa, Y0 = radPx * se, Z0 = radPx * ce * ca;   // 自转后的局部 3D
+      const X = X0 * Math.cos(sandSpin) + Z0 * Math.sin(sandSpin);         // 再绕整体 Y 轴（spin 时非零，与爱心同步自转）
+      const Z = -X0 * Math.sin(sandSpin) + Z0 * Math.cos(sandSpin);
+      const sc = focal / (focal - Z);                 // 伪 3D 透视：前方放大、后方缩小
+      p.z = Z;
+      p.sx = ccx + X;
+      p.sy = ccy + Y0 * 0.82;                        // 竖向压扁，贴合爱心比例
+      p.ss = p.r * 1.7 * sc;
+      let a = 0.20 * p.r * Math.min(1.5, sc) * sandFade;
+      if (Z < 0) a *= 0.5;                          // 后方更暗 → 强化立体纵深
+      p.sa = a;
+    }
+  }
+  // 按深度分两批绘制：zlo~zhi 之外的跳过。后方(z<0)在爱心前画（被遮）、前方(z>=0)在爱心后画（覆盖）
+  function drawSandBatch(zlo, zhi) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of sand) {
+      if (p.z < zlo || p.z > zhi) continue;
+      if (p.sa <= 0.004) continue;
+      if (SAND_DEPTH === 'sphere') {                       // 带高光的小球：有体积/光影（立体沙尘）
+        const s = p.ss;
+        ctx.fillStyle = `rgba(${p.c.r},${p.c.g},${p.c.b},${p.sa})`;
+        ctx.beginPath(); ctx.arc(p.sx, p.sy, s, 0, 6.283); ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${Math.min(0.9, p.sa * 1.6)})`;
+        ctx.beginPath(); ctx.arc(p.sx - s * 0.3, p.sy - s * 0.3, s * 0.4, 0, 6.283); ctx.fill();
+      } else {                                             // 细沙方粒（沙尘感）
+        ctx.fillStyle = `rgba(${p.c.r},${p.c.g},${p.c.b},${p.sa})`;
+        ctx.fillRect(p.sx - p.ss / 2, p.sy - p.ss / 2, p.ss, p.ss);
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  const startTime = performance.now();
+
+  const HY_TOP = -11.5 * STRETCH_Y, HY_BOT = 17 * STRETCH_Y;    // 心形局部 y 的范围（上 → 下；随纵向拉伸同步）
+  const targets = [];
+  for (let i = 0; i < HEART_N; i++) targets.push(sampleTarget(PRESETS[SHAPE]));
+
+  // 生长顺序：两种成型方式可自由切换（见左上角按钮）
+  //   'notch'  中间向俩侧：以顶部凹口为 0，沿角度向两侧+向下扫到尖底为 1（像两支笔从凹口向俩边画）
+  //   'bottom' 自下而上：底部尖最先，向上长到凹口（原版）
+  let FORMATION = 'notch';       // 当前生效的成型方式（决定每颗粒子的生长顺序）
+  let pendingMode = null;       // 用户刚选、但「尚未生效」的方式：当前爱心不重生成，等下一次切割→聚合才用
+
+  // 上半段（凹口 → 心腰）改用「凹口描边序」：每颗粒子的凹口序 nOrder 由 applyOrder() 预先算好
+  //   （轮廓粒子=notchOrderT(tp)，内部粒子=最近轮廓点的序），上半段整体归一到 [0, TS]（见 rawOrder）。
+  // 尾段（心腰 → 尖底）仍走下方 tailQ 的「按数量均匀」映射，与上半段在 TS 处无缝衔接。
+  // 分位数映射表（仅尾段使用）。尾段必须按「粒子数量」均匀：
+  //   原 pow(hp,1.35) 会让大量粒子挤在尖端附近同一 order，聚合到最后一帧像「瞬间生成」。
+  //   统计尾段每个高度上有多少粒子，按累计数量把高度重新均匀分成 512 份，最末一点也被逐颗拉开。
+  const QMAP_N = 512;
+  let TQMAP = null;                    // 尾段（hy>TAIL_BEGIN）的「按数量均匀」映射表
+  const TAIL_BEGIN = 7.0 * STRETCH_Y;  // 尾段起始高度（与 rawOrder 的分段阈值保持一致）
+  // 尾段分位表：统计尾段每个高度上有多少粒子，按累计数量把高度重新均匀分成 512 份，
+  //   使尖端被逐颗拉开（收尾不会一帧冒出）。可对任意粒子数组构建（首次生成用 targets，切形状后用 heart）。
+  function buildQMap(arr) {
+    const list = arr || targets;
+    const tv = [];
+    for (const t of list) if (t.hy > TAIL_BEGIN) tv.push(t.hy);
+    TQMAP = new Float32Array(QMAP_N + 1);
+    if (tv.length > 1) {
+      tv.sort((a, b) => a - b);                            // 从尾段顶(小) → 尖端(大)
+      for (let i = 0; i <= QMAP_N; i++) {
+        const q = i / QMAP_N;
+        TQMAP[i] = tv[Math.min(tv.length - 1, Math.floor(q * (tv.length - 1)))];
+      }
+    }
+  }
+  // 尾段高度 → 按数量均匀的 0~1 进度（0=尾段顶，1=尖端）
+  function tailQ(hy) {
+    if (!TQMAP) return 0;
+    let lo = 0, hi = QMAP_N;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (TQMAP[mid] < hy) lo = mid + 1; else hi = mid; }
+    return lo / QMAP_N;
+  }
+  // 单颗的「凹口序」nOrder（上半段描边序的几何值）：轮廓粒子用参数 t 求，内部粒子取最近轮廓点。
+  function computeNOrder(tg) {
+    if (tg.outline) { tg.nOrder = notchOrderT(tg.tp); return; }
+    let best = Infinity, bo = 0;
+    for (const c of _CS) {
+      const d = (c.x - tg.hx) * (c.x - tg.hx) + (c.y - tg.hy) * (c.y - tg.hy);
+      if (d < best) { best = d; bo = c.o; }
+    }
+    tg.nOrder = bo;
+  }
+  // 几何序（在「凹口→尖底」方向上严格单调）。notch：凹口(0)→心腰(TS)→尖底(TS..TAIL_END)；
+  //   bottom：底尖(0)→凹口(1)。仅决定「先后顺序」，最终 order 再经全局数量均匀重映射（见 recomputeOrders）。
+  function rawOrder(tg, mode) {
+    if (mode === 'notch') {
+      const TS = 0.52, TAIL_END = 0.94;                    // TAIL_BEGIN：尾巴区起始高度（约心腰）
+      if (tg.hy > TAIL_BEGIN) {
+        let q = tailQ(tg.hy);                                // 0=尾巴顶 → 1=尖端（按数量均匀）
+        // 接缝混合带：仅作用于尾巴最上面一小段（q < 0.12），外侧略先、中轴略后，与上半段衔接
+        if (q < 0.12) {
+          const blend = 1 - q / 0.12;                        // 1（接缝处）→ 0（q=0.12 以下）
+          const hw = Math.max(0.5, halfWidth(tg.hy));
+          const side = Math.min(1, Math.abs(tg.hx) / hw);    // 0=中轴, 1=最外侧
+          q += (side - 0.5) * 0.05 * blend;                  // 外侧提前、中轴延后，方向与上半段衔接
+        }
+        return TS + (TAIL_END - TS) * q;
+      }
+      // 上部（凹口 → 心腰）：凹口序 nOrder 归一到 [0, TS]，保证凹口最先、心腰收尾。
+      return Math.min(1, (tg.nOrder / S_WAIST) * TS);
+    }
+    // 原版：自下而上 —— 底部尖最先，向上长到凹口
+    const hOrder = (HY_BOT - tg.hy) / (HY_BOT - HY_TOP);       // 高度进度：底部(0) → 顶部(1)
+    return Math.min(1, Math.max(0, tg.outline
+      ? Math.max(hOrder, Math.abs(tg.tp - Math.PI) / Math.PI)
+      : hOrder));
+  }
+  // 全局「按粒子数量均匀」重映射：把几何序 ro 重排成累计分位 → 每一单位 order 的粒子数相同，
+  //   时间轴上「新起飞粒子数」恒定，抹平上半段(凹口描边)与尾段(心腰→尖底)接缝处的低密度谷（断连）。
+  //   不改变先后顺序：ro 在几何上本就凹口→尖底单调，重映射后仍单调（凹口仍最先、尖底仍最后）。
+  function applyGlobalUniform(arr) {
+    const ro = arr.map(t => t.ro).sort((a, b) => a - b);
+    const map = new Float32Array(QMAP_N + 1);
+    for (let i = 0; i <= QMAP_N; i++) map[i] = ro[Math.min(ro.length - 1, Math.floor((i / QMAP_N) * (ro.length - 1)))];
+    for (const t of arr) {
+      let lo = 0, hi = QMAP_N;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (map[mid] < t.ro) lo = mid + 1; else hi = mid; }
+      t.order = lo / QMAP_N;
+    }
+  }
+  // 完整重算顺序：凹口序 → 几何序 ro → 全局数量均匀序 order，并排序。对任意粒子数组生效，
+  //   首次生成传 targets，切形状后传 heart（位置已更新），二者共用同一套顺序逻辑。
+  function recomputeOrders(arr) {
+    buildQMap(arr);
+    let sMax = 1e-6;
+    for (const tg of arr) {
+      computeNOrder(tg);
+      if (tg.hy <= TAIL_BEGIN && tg.nOrder > sMax) sMax = tg.nOrder;
+    }
+    S_WAIST = sMax;
+    for (const tg of arr) tg.ro = rawOrder(tg, FORMATION);
+    applyGlobalUniform(arr);
+    arr.sort((a, b) => a.order - b.order);
+  }
+  function applyOrder() { recomputeOrders(targets); }
+  applyOrder();
+
+  // 颜色按高度渐变：顶部色 → 底部色（可调，默认顶白底粉；点「纯色」可切换为单一颜色）
+  // 用「待生效」机制：调色只记下，下一次切割→聚合时才套用，与形状/方式切换一致
+  function hex2rgb(h) {
+    const s = h.replace('#', '');
+    return { r: parseInt(s.slice(0, 2), 16), g: parseInt(s.slice(2, 4), 16), b: parseInt(s.slice(4, 6), 16) };
+  }
+  let COL_TOP = { r: 255, g: 255, b: 255 };   // 顶部色（默认白）
+  let COL_BOT = { r: 255, g: 75, b: 140 };    // 底部色（默认粉）
+  let SOLID = false;                          // 纯色模式：整颗心（含沙暴）单一颜色，忽略上下渐变
+  let COL_SOLID = { r: 255, g: 75, b: 140 };  // 纯色（默认粉）
+  let colorTouched = false;                   // 调色板是否被动过：均衡饱满以此决定是否跟随顶/底色盘
+  function baseColor(hy) {                    // 无抖动的基准色（球体贴图取样用：同高度必同色）
+    const clamp = v => v < 0 ? 0 : (v > 255 ? 255 : v);
+    if (SOLID) return { r: COL_SOLID.r, g: COL_SOLID.g, b: COL_SOLID.b };
+    const t = Math.max(0, Math.min(1, (hy - HY_TOP) / (HY_BOT - HY_TOP)));   // 0=顶 1=底
+    return {
+      r: clamp(Math.round(COL_TOP.r + (COL_BOT.r - COL_TOP.r) * t)),
+      g: clamp(Math.round(COL_TOP.g + (COL_BOT.g - COL_TOP.g) * t)),
+      b: clamp(Math.round(COL_TOP.b + (COL_BOT.b - COL_TOP.b) * t))
+    };
+  }
+  function colorByHeight(hy) {                // 粒子实际用色 = 基准色 + 极轻抖动（维持颗粒质感）
+    const c = baseColor(hy);
+    const clamp = v => v < 0 ? 0 : (v > 255 ? 255 : v);
+    return { r: c.r, g: clamp(c.g + (Math.random() * 8 | 0)), b: clamp(c.b + (Math.random() * 8 | 0)) };
+  }
+  // 确定性碎钻配色（均衡饱满专用）：基于 idx 稳定，不随帧抖动。整体鲜艳、无上下渐变、钻石闪烁感。
+  function diamondColor(idx) {
+    const r = ((idx * 2654435761) >>> 0) / 4294967296;   // [0,1) 确定性（同粒子恒同色，不闪烁）
+    // 调色板拖动后，钻石主色/辅色跟随顶·底色盘；未调色则保持默认粉钻
+    const top = colorTouched ? COL_TOP : { r: 255, g: 150, b: 188 };
+    const bot = colorTouched ? COL_BOT : { r: 255, g: 65,  b: 150 };
+    const lit = (c, k) => ({ r: Math.min(255, (c.r + (255 - c.r) * k) | 0),
+                             g: Math.min(255, (c.g + (255 - c.g) * k) | 0),
+                             b: Math.min(255, (c.b + (255 - c.b) * k) | 0) });
+    const dk  = (c, k) => ({ r: (c.r * (1 - k)) | 0, g: (c.g * (1 - k)) | 0, b: (c.b * (1 - k)) | 0 });
+    if (r < 0.18) return lit(top, 0.90);        // 高光闪（主色提亮，近白）
+    if (r < 0.46) return { r: top.r, g: top.g, b: top.b };            // 主色（占比最多）
+    if (r < 0.64) return lit(top, 0.30);         // 主色偏亮
+    if (r < 0.82) return { r: bot.r, g: bot.g, b: bot.b };            // 辅色
+    return dk(top, 0.20);                         // 主色偏深
+  }
+  // 均衡饱满的「基础单色」：纯色模式→COL_SOLID；否则调色板拖动后跟随顶色盘，未动保持默认粉钻。
+  // 供球型贴图/沙暴取单色用（颗粒模式的多彩由 diamondColor 按 idx 生成，不走这里）。
+  function balanceBaseColor() {
+    if (SOLID) return COL_SOLID;
+    return colorTouched ? COL_TOP : { r: 255, g: 150, b: 188 };
+  }
+  // 按当前形状取粒子颜色：原版=上下渐变；均衡饱满=碎钻鲜艳（无视高度，无渐变）。纯色模式两者均归纯色。
+  function shapeColor(hy, idx) {
+    if (PARTICLE_STYLE === 'sphere') {
+      if (SOLID) return COL_SOLID;          // 纯色模式：球型也单一色，遵循调色板
+      return sphereAuroraColor(hy);         // 球型极光：未调色走默认素雅；调色后跟随顶/底色盘
+    }
+    if (SHAPE === 'balance') return SOLID ? COL_SOLID : diamondColor(idx);
+    return SOLID ? COL_SOLID : colorByHeight(hy);   // 纯色模式整颗心单一色（含默认心形）；切黑则变黑隐身，形成干净夜空
+  }
+
+  // 球型极光配色（素雅清冷）：淡紫青、低饱和、颜色沿高度温润流动，与原/均衡饱满解耦
+  function hsl2rgb(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return { r: Math.round(255 * f(0)), g: Math.round(255 * f(8)), b: Math.round(255 * f(4)) };
+  }
+  function rgb2hsl(c) {                    // RGB→HSL：球型配色跟随调色板时取顶/底 HSL 用
+    const r = c.r / 255, g = c.g / 255, b = c.b / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let h = 0; const l = (mx + mn) / 2;
+    const s = d < 1e-6 ? 0 : (l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn));
+    if (d > 1e-6) {
+      if (mx === r) h = ((g - b) / d) % 6;
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60; if (h < 0) h += 360;
+    }
+    return { h, s: s * 100, l: l * 100 };
+  }
+  function lerpHue(a, b, t) {              // 色相环形插值：避免红↔青走反方向
+    let d = b - a; if (d > 180) d -= 360; else if (d < -180) d += 360;
+    return ((a + d * t) % 360 + 360) % 360;
+  }
+  function sphereAuroraColor(hy) {
+    const u = Math.max(0, Math.min(1, (hy - HY_TOP) / (HY_BOT - HY_TOP)));   // 0=顶 1=底
+    // 始终遵循调色板顶/底色盘：沿高度做色相流动；饱和/亮度适度收敛，保持素雅、不过曝
+    const th = rgb2hsl(COL_TOP), bh = rgb2hsl(COL_BOT);
+    const h = lerpHue(th.h, bh.h, u);
+    const s = Math.min(60, Math.max(th.s, bh.s) * 0.9);
+    const l = Math.max(42, Math.min(82, th.l + (bh.l - th.l) * u));
+    return hsl2rgb(h, s, l);
+  }
+
+  /* ---------- 球型粒子：预渲染发光球贴图（按高度分档着色，避免每帧 createRadialGradient） ----------
+     每帧给上万颗粒子各建一个径向渐变会直接卡死，故改为：按高度分 24 档预渲染 24 张贴图，
+     绘制时只 drawImage（缩放 + lighter 叠加）。球型「飞行中 / 烟花」才抽样（少而大），
+     已归位的粒子全部参与 → 成型后的爱心依然饱满密实。 */
+  PARTICLE_STYLE = 'grain';        // 声明已提前到 PRESETS 上方（sampleTarget 顶层执行时要读它）
+  const SPHERE_BANDS = 24;         // 高度分档数
+  const SPHERE_STRIDE = 18;        // 重聚飞行中抽样间隔：每 18 颗画 1 颗（约 722 颗，较原 13 → 1000 颗更少、更清爽）
+  const SPHERE_FW_STRIDE_UP = 7;   // 烟花·向上飞的那批（约 930 颗）：上方烟瓣适度加厚，落下时成流星
+  const SPHERE_FW_STRIDE_DOWN = 12;// 烟花·起爆即朝下的那批（约 540 颗）：更清爽，不与流星抢视线
+  const LOCK_EASE = 10;            // 锁定后收尾缓动帧数：彗星光晕平滑收成小圆点（消除"啪一下缩掉"的跳变）
+  const LOCK_DIST = 7;             // 吸附阈值（px）：d≤此值即进入落地缓冲，略大于 6 以减少临界阻尼末段"蜗行"
+  const LAND_SPREAD = 28;          // 落地缓冲随机错峰帧数：粒子各自延迟 0~28 帧才真正锁定 → 打散"尾部成批咔到位"的台阶感
+  const SPHERE_SIZE_MUL = 5.8;     // 球直径 = 粒径 × 倍数（球数减少 → 体积相应增大，覆盖不减；配合 STRIDE=18 补回覆盖）
+  const SPHERE_TRAIL = 4;          // 运动拖尾层数
+  const SPHERE_TRAIL_A = 0.55;     // 拖尾基础亮度（越接近球体越明显）
+  const SPHERE_ALPHA_MUL = 1.18;   // 球型整体加浓：比颗粒更实、更重
+  let sphereSprites = [], sphereDPR = 0;
+  function boostColor(c) {         // 「颜色重一些」：提饱和 + 微提亮，球体比颗粒更浓更艳
+    const lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+    const k = 1.62;                // 饱和度倍率
+    const cl = v => v < 0 ? 0 : (v > 255 ? 255 : v);
+    return {
+      r: cl(Math.round((lum + (c.r - lum) * k) * 1.06)),
+      g: cl(Math.round((lum + (c.g - lum) * k) * 1.06)),
+      b: cl(Math.round((lum + (c.b - lum) * k) * 1.06))
+    };
+  }
+  function buildSphereSprites() {
+    sphereSprites = [];
+    sphereDPR = DPR;
+    const px = Math.round(28 * DPR);                 // 贴图边长（逻辑 28px，按 DPR 放大保持锐利）
+    for (let i = 0; i < SPHERE_BANDS; i++) {
+      const hy = HY_TOP + (HY_BOT - HY_TOP) * (i / (SPHERE_BANDS - 1));
+      const c = SOLID ? COL_SOLID : sphereAuroraColor(hy);   // 纯色模式单一色；否则素雅清冷极光（跟随调色板）
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = px;
+      const g = cv.getContext('2d');
+      const h = px / 2;
+      // 高光用「底色掺 60% 白」而非纯白：纯白核心在 lighter 叠加下会把整颗心冲成白色，反而丢掉颜色
+      const hl = { r: Math.round(c.r + (255 - c.r) * 0.6),
+                   g: Math.round(c.g + (255 - c.g) * 0.6),
+                   b: Math.round(c.b + (255 - c.b) * 0.6) };
+      const grd = g.createRadialGradient(h, h, 0, h, h, h);
+      grd.addColorStop(0.00, `rgba(${hl.r},${hl.g},${hl.b},0.92)`);  // 高光核心（带底色）
+      grd.addColorStop(0.26, `rgba(${c.r},${c.g},${c.b},0.92)`);
+      grd.addColorStop(0.58, `rgba(${c.r},${c.g},${c.b},0.40)`);    // 向外渐隐 → 柔光光晕
+      grd.addColorStop(1.00, `rgba(${c.r},${c.g},${c.b},0)`);
+      g.fillStyle = grd; g.fillRect(0, 0, px, px);
+      sphereSprites.push(cv);
+    }
+  }
+
+  const SPAWN_SPREAD = 150;   // 首次生成：order→等待时长 的铺开帧数（越小，整颗心越快长完）
+  const SPRAY_R = 420;        // 底部横向喷洒半径：左右各可超出屏幕这么多（更宽的横向区域）
+  const START_BELOW = 40;     // 起点在屏幕下方「看不见」处这么多像素 → 一出现就往上飞，不在底部堆着等
+  function makeHeart(i) {
+    const tg = targets[i];
+    const c = shapeColor(tg.hy, i);
+    // 仍从底部喷洒上升（原观感）；但「归位先后」按聚合的「由中间向俩侧」order 排布（与切割后聚合同源）：
+    // 凹口(序0)先聚、沿俩侧向下扫到尖底(序1)最后聚；尖端段再靠 end-ramp 减速 → 小尾巴在最后、由顶向尖渐进收尾
+    const dl = 8 + tg.order * SPAWN_SPREAD;
+    const sx = rand(-SPRAY_R, W + SPRAY_R);                       // 横向喷洒半径：可超出屏幕左右
+    // 起点在屏幕下方「看不见」处：喷出来时已经贴着底部出现，然后径直往上飞向爱心
+    const sy = H + rand(6, START_BELOW);
+    return {
+      idx: i,                // 稳定序号：球型模式按它抽样渲染（深度排序后仍稳定，不会闪烁）
+      hx: tg.hx, hy: tg.hy, outline: tg.outline, tp: tg.tp, depth: tg.outline ? 1 : rand(0.93, 1.07),
+      spray: !!tg.spray, sprayD: tg.sprayD || 1, sprayA: tg.sprayA || tg.aMax,   // 外围散粒子标记（球型下收回边缘）
+      order: tg.order,       // 生长顺序号：复原/首次聚合都按同一顺序依次归位
+      reformWait: 0,         // 复原排队倒计时（帧），>0 表示还在底部等自己的顺序
+      locked: false,         // 是否已锁定在心形原位（只有锁定的才画虚影）
+      x: sx, y: sy,
+      px: sx, py: sy,        // 上一帧位置：用于求本帧位移 → 运动拖尾方向
+      vx: rand(-0.5, 0.5), vy: -rand(1.2, 3.2),                  // 直接向上飞，不做底部堆积
+      delay: dl,                                            // 归位先后由「由中间向俩侧」顺序决定（尖端最晚）
+      size: rand(0.35, 0.95), ph: rand(0, 6.28), jit: rand(0.15, 0.7),
+      fade: 0, aMax: tg.aMax, st: null,                          // 淡入 / 最终亮度 / 缓存的最终样式串
+      settle: 0,                                            // 锁定后收尾缓动计时（帧）
+      landing: false, landT: 0, landHold: 0,                 // 落地缓冲：错峰延迟锁定，消除成批台阶 + 位置硬跳
+      _a: 0.12,                                                  // 本帧透明度（球型绘制用）
+      r: c.r, g: c.g, b: c.b
+    };
+  }
+  // 不再一次性生成：在循环里从底部逐渐喷洒、慢慢聚成爱心
+
+  /* ---------- 划屏切爱心（切水果式） ---------- */
+  let scattered = false;        // 爱心是否已散落一地（首次生成走「底部喷洒上升」路径，并非散落态）
+  let heartReady = false;       // 爱心是否已完全成型（全部粒子生成并归位），成型前不可切割
+  const MIN_CUT = 65;           // 至少划出这么远才算「切一刀」，避免快速点击时的微小抖动误切
+  let stroke = null;            // 划动轨迹点（画划痕用，带时间渐隐）
+  let swiping = false, lastX = 0, lastY = 0, downX = 0, downY = 0, swipeDX = 0, swipeDY = 0;
+
+  // 判断划动线段是否切到当前爱心（含漂移/心跳后的实际位置，留一点边缘余量）
+  function cutHitsHeart(x1, y1, x2, y2) {
+    if (scattered || !heartReady) return false;   // 已散落、或爱心尚未成型 → 都不可切
+    const sc = S;
+    const steps = 24;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const sx = x1 + (x2 - x1) * t, sy = y1 + (y2 - y1) * t;
+      const lx = (sx - CX - ox) / sc, ly = (sy - CY - oy) / sc;
+      if (insideHeart(lx * 0.9, ly * 0.9)) return true;   // ×0.9 放大判定区，边缘也能切中
+    }
+    return false;
+  }
+
+  // 爱心碎裂：像「小爆炸」——每颗粒子从当前位置沿「离心方向」向外炸开（四周都有），
+  // 爆炸后受重力自由下落，落到哪算哪、自然堆在屏幕下方（横向不做任何落点引导）。
+  // 纵向：给每颗一个「随机的微小落差」当落脚点（模拟起伏地面），使粒子叠成有厚度的一层、
+  //       而不是全压在同一条水平线上（那样会显得空旷、有空隙）。
+  function scatter(dirx, diry) {
+    if (scattered) return;
+    scattered = true;
+    scatterAt = performance.now();   // 记下散落时刻：用于「全部落定才允许重聚」的兜底计时
+    sparks.length = 0;   // 清空残留火星，散落后只留碎片坠落，不再有喷洒效果
+    const cxp = CX + ox, cyp = CY + oy;         // 爆炸中心（爱心中心，含漂移偏移）
+    // 落点：底部「密实薄层」——层厚约 15px，13000 颗粒子铺满屏宽、覆盖率约 90%，几乎无缝隙。
+    const STACK = 15;                            // 底部落点层厚度（px）：越薄越密实、越无隙
+    // 球型：走「烟花」——不落地、不撞边反弹，径直向外绽放并飞出屏幕
+    const FW = (PARTICLE_STYLE === 'sphere');
+    for (const p of heart) {
+      // 离心方向：从爆炸中心指向粒子自身 → 四周均有，不是单纯横向
+      let dx = p.x - cxp, dy = p.y - cyp;
+      let d = Math.hypot(dx, dy) || 1;
+      dx /= d; dy /= d;
+      if (FW) {
+        // 烟花：从心形表面向四周放射，但方向带随机角度散布 → 蓬松的球状绽放（不是笔直射线）
+        // 初速分层 + 温和阻力 + 轻微重力 → 炸开过程更舒展、轨迹自然下垂成弧线（像烟花，不直不快）
+        const ang = Math.atan2(dy, dx) + rand(-0.7, 0.7);     // 方向随机散布 ±40°：更蓬松发散、轨迹更弯
+        const spd = rand(4.5, 11);                          // 初速更慢（峰值降约 1/3）：绽放舒展、且首帧位移小 → 不卡
+        const perp = ang + Math.PI / 2;                     // 垂直方向：额外扰动增强蓬松感
+        const jit = rand(-1.6, 1.6);
+        p.vx = Math.cos(ang) * spd + Math.cos(perp) * jit + dirx * rand(0.5, 2);
+        p.vy = Math.sin(ang) * spd + Math.sin(perp) * jit + diry * rand(0.5, 2);
+        p.floorY = Infinity;                     // 永不触底（不落在屏幕底下）
+        p.fw = true;                             // 烟花标记：fall() 走无边界、无落地的分支
+        // 起爆方向：向上飞的（vy<0）单独标记 → 绘制更密。
+        //   它们先在上方铺出更厚的烟瓣，随后被 FW_GRAV 拉下来，下落时拖尾朝下 = 流星雨。
+        //   标记在爆炸这一刻定死、此后不变 → 不会因方向翻转导致粒子忽隐忽现。
+        p.fwUp = p.vy < 0;
+      } else {
+        // 爆炸初速：离心为主 + 一点随机扰动；沿切割方向(dirx,diry)再叠加一点冲量
+        const spd = rand(3.5, 11);               // 初速大小随机 → 炸开范围有层次
+        p.vx = dx * spd + rand(-3, 3) + dirx * rand(1, 4);
+        p.vy = dy * spd + rand(-3, 2) + diry * rand(1, 4);
+        // 落脚高度：随机分布在 [H-3-STACK, H-3]（贴底更密），形成薄而密实的一层
+        p.floorY = H - 3 - Math.pow(Math.random(), 1.5) * STACK;
+        p.fw = false;
+      }
+      p.locked = false; p.landing = false; p.settle = 0;   // 脱离原位 + 清落地缓冲/收尾态
+    }
+    if (starEnabled) {                         // 银色星星点缀：球型(烟花)与颗粒(碎裂)切割都生成，缓缓飘动+闪烁+淡出
+      stars.length = 0;
+      const ns = FW ? 72 : 48;                 // 颗粒模式稍少，避免与满地碎片挤在一起
+      for (let i = 0; i < ns; i++) {
+        // 半屏半径内、以爆炸中心为圆心的散布（近中心密、边缘疏），兼顾「炸开」与「满屏点缀」
+        const ang = Math.random() * Math.PI * 2;
+        const rad = Math.pow(Math.random(), 0.7) * Math.min(W, H) * 0.55;
+        stars.push({
+          x: cxp + Math.cos(ang) * rad,
+          y: cyp + Math.sin(ang) * rad,
+          vx: rand(-0.22, 0.22), vy: rand(-0.5, -0.05),   // 缓缓上浮
+          life: 0, maxLife: rand(70, 150),
+          size: rand(1.8, 4.5),
+          rot: Math.random() * Math.PI, spin: rand(-0.018, 0.018),
+          tp: Math.random() * Math.PI * 2                          // 闪烁相位
+        });
+      }
+    } else {
+      stars.length = 0;                        // 微星已关闭：不生成、清空残留
+    }
+  }
+
+  // 碎片落地物理：重力 + 轻微空气阻力 + 触底轻弹 + 撞左右屏边弹回
+  // ——保证每一颗碎片都留在屏幕里，复原时用的就是眼前这一地，不会有粒子从屏幕外飞进来
+  // 落地即停：触底（各自的落脚高度 floorY）后迅速停住；不做「高度场无限堆叠」以免叠到天上。
+  const GRAV = 0.34;                            // 重力（越大下落越快、抛物线越明显）
+  const FW_GRAV = 0.17;                        // 烟花碎片重力：更明显的下垂弧线（比颗粒更弯，烟花感强）
+  const FW_DRAG = 0.987;                       // 烟花碎片阻力：略增衰减 → 慢速下仍能飞出屏并干净定格（落定不拖沓）
+  function fall(p, dt) {
+    if (p.fw) {                               // ---- 烟花碎片：飞出屏幕，不落地、不撞边反弹 ----
+      if (p.vx === 0 && p.vy === 0) return;   // 已飞出并停住：不再受力（避免余烬被慢慢拽回屏幕内）
+      p.vy += FW_GRAV * dt;                   // 始终轻微重力 → 轨迹自然下垂成弧线（烟花感），不是笔直飞出
+      p.vx *= FW_DRAG; p.vy *= FW_DRAG;       // 温和阻力：绽放更舒展、拖尾更长、不再瞬间窜出屏幕
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      // 一出屏幕就定格在外面；速度燃尽的余烬同样定格（=熄灭消失），否则会在屏幕里永远飘着
+      if (p.x < -40 || p.x > W + 40 || p.y < -40 || p.y > H + 40
+          || Math.abs(p.vx) + Math.abs(p.vy) < 0.5) { p.vx = 0; p.vy = 0; }
+      return;
+    }
+    p.vy += GRAV * dt;
+    // 空气阻力：让爆炸初速逐渐衰减，粒子不会一直水平冲飞
+    p.vx *= 0.985; p.vy *= 0.995;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.y >= p.floorY) {                    // 触底（各自的落脚高度）
+      p.y = p.floorY;
+      if (Math.abs(p.vy) > 1.5) {             // 还很快 → 轻弹一下（保留一点落地的活感）
+        p.vy = -p.vy * 0.16; p.vx *= 0.7;
+      } else {                                 // 基本停了 → 就地停住
+        p.vy = 0; p.vx *= 0.5;
+      }
+    }
+    if (p.x < 3) { p.x = 3; p.vx = Math.abs(p.vx) * 0.35; }              // 左边界弹回
+    else if (p.x > W - 3) { p.x = W - 3; p.vx = -Math.abs(p.vx) * 0.35; } // 右边界弹回
+  }
+
+  // 「散落已完全落定」判定：只有全部粒子都躺稳/飞出后，点击才允许重聚 —— 否则一地还在飞的
+  // 粒子会被硬生生拉回来，观感像卡帧。
+  //   颗粒：必须落到各自落脚线 floorY 上、且速度归零（弹跳也要停）
+  //   烟花：必须飞出屏幕并定格（屏幕内还在飘的余烬不算落定）
+  const SETTLE_V = 0.35;        // 静止阈值：|vx|+|vy| 低于此值即视为停稳
+  const SETTLE_MAX_MS = 20000;  // 兜底：万一有粒子迟迟不停，20s 后无条件放行（避免永远点不动）
+  let scatterAt = 0;            // 本轮散落开始时刻
+  function allSettled() {
+    if (performance.now() - scatterAt > SETTLE_MAX_MS) return true;
+    for (const p of heart) {
+      if (p.fw) {                                            // 烟花碎片
+        if (p.vx === 0 && p.vy === 0) continue;              // 已飞出并定格
+        if (p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) continue;   // 已出屏（下一帧即定格）
+        return false;                                        // 还在屏幕内飘 → 未落定
+      }
+      if (p.y < p.floorY - 0.8) return false;                // 还在空中
+      if (Math.abs(p.vx) + Math.abs(p.vy) > SETTLE_V) return false;   // 还在弹跳/贴地滑行
+    }
+    return true;
+  }
+
+  // 复原：不清空粒子，让散落一地的那些粒子飞回原位重新聚成爱心
+  // 关键：不再一哄而上，而是按首次生成的同一套顺序依次起飞
+  //   底尖轮廓 → 两侧轮廓与内部同步向上 → 凹口与两瓣顶端同时收尾（总时长与首次生成一致）
+  const REFORM_SPREAD = 240;   // 整队起飞铺开的帧数（缩短→起步更密、底部余烬更快变薄，整体更连贯）
+
+  // 左右交叉重排：散落粒子落点偏左 → 重新聚成爱心【右】半，偏右 → 【左】半，
+  //   即左右两堆在屏幕中央交叉飞过（底左→右半、底右→左半），形成「交织 / 翻转」的成型观感。
+  //   做法：按当前落点 x 排序，最左 nR 颗分配右半目标、最右 nL 颗分配左半目标（双射，整颗心刚好填满）。
+  function reassignSides() {
+    const L = [], R = [];
+    for (const p of heart) (p.hx < 0 ? L : R).push({ hx: p.hx, hy: p.hy, outline: p.outline, tp: p.tp, aMax: p.aMax,
+      spray: p.spray, sprayD: p.sprayD, sprayA: p.sprayA });
+    const nL = L.length, nR = R.length;
+    L.sort((a, b) => a.hy - b.hy);          // 同半内按高度排序，便于与落点按高度配对（观感自然）
+    R.sort((a, b) => a.hy - b.hy);
+    const byX = heart.slice().sort((a, b) => a.x - b.x);   // 当前落点 x 升序（最左 → 最右）
+    const leftPile = byX.slice(0, nR);        // 最左 nR 颗 → 右半目标
+    const rightPile = byX.slice(nR);          // 最右 nL 颗 → 左半目标（两段正好首尾相接、覆盖全部）
+    leftPile.sort((a, b) => a.y - b.y); rightPile.sort((a, b) => a.y - b.y);
+    for (let i = 0; i < nR; i++) {            // 底左粒子 → 右半爱心
+      const p = leftPile[i], t = R[i];
+      p.hx = t.hx; p.hy = t.hy; p.outline = t.outline; p.tp = t.tp; p.aMax = t.aMax;
+      p.spray = t.spray; p.sprayD = t.sprayD; p.sprayA = t.sprayA;
+      p.depth = t.outline ? 1 : p.depth; p.st = null;
+      const c = shapeColor(t.hy, p.idx); p.r = c.r; p.g = c.g; p.b = c.b;
+    }
+    for (let i = 0; i < nL; i++) {            // 底右粒子 → 左半爱心
+      const p = rightPile[i], t = L[i];
+      p.hx = t.hx; p.hy = t.hy; p.outline = t.outline; p.tp = t.tp; p.aMax = t.aMax;
+      p.spray = t.spray; p.sprayD = t.sprayD; p.sprayA = t.sprayA;
+      p.depth = t.outline ? 1 : p.depth; p.st = null;
+      const c = shapeColor(t.hy, p.idx); p.r = c.r; p.g = c.g; p.b = c.b;
+    }
+  }
+
+  // 重抽每颗粒子的目标（形状已最新）：供「切割→重聚」与「即时切换」复用
+  function resampleShape() {
+    const P = PRESETS[SHAPE];
+    for (const p of heart) {
+      const tg = sampleTarget(P);
+      const c = shapeColor(tg.hy, p.idx);
+      p.hx = tg.hx; p.hy = tg.hy; p.outline = tg.outline; p.tp = tg.tp;
+      p.spray = tg.spray; p.sprayD = tg.sprayD; p.sprayA = tg.sprayA;
+      p.aMax = tg.aMax; p.depth = tg.outline ? 1 : rand(0.93, 1.07);
+      p.r = c.r; p.g = c.g; p.b = c.b;
+      p.st = null;   // 失效亮度缓存：目标位置变了，必须按新位置重新计算亮度/透明度
+    }
+  }
+  // 已成型时即时切换形状：重抽目标 + 释放锁定 → 粒子惯性morph到新形状（无需切割）
+  function applyShapeImmediate() {
+    if (pendingShape === null) return;
+    SHAPE = pendingShape; pendingShape = null;
+    resampleShape();
+    for (const p of heart) p.locked = false;
+  }
+  function reform() {
+    scattered = false;
+    stars.length = 0;     // 清空银色星星：重聚时不再点缀，画面交还给爱心本体
+    reforming = true; reformEase = 0;
+    startSand();          // 切割→聚合：掀起一圈稀疏的沙尘暴环绕爱心（聚合完成后淡出）
+    // 若用户切换了成型方式 / 形状，则在此（下一次聚合的起点）才生效：重算目标位置与生长顺序
+    // —— 当前已成型 / 散落的爱心保持不变，不重走生成过程
+    if (pendingMode !== null) { FORMATION = pendingMode; pendingMode = null; }
+    if (pendingShape !== null) {           // 重新抽取每颗粒子的目标位置/亮度/颜色，得到新形状
+      SHAPE = pendingShape; pendingShape = null;
+      resampleShape();
+    }
+    // 烟花碎片此时可能已飞到几千像素外 → 收敛到「屏幕外一圈」（保持放射方向不变），
+    // 否则复原时每颗都要飞几千像素，收尾会被拖得极长。收敛后最远只多飞约 150px。
+    {
+      const maxR = Math.hypot(W, H) * 0.5 + 150;
+      for (const p of heart) {
+        if (!p.fw) continue;
+        const dx = p.x - CX, dy = p.y - CY, d = Math.hypot(dx, dy) || 1;
+        if (d > maxR) { p.x = CX + dx / d * maxR; p.y = CY + dy / d * maxR; }
+      }
+    }
+    reassignSides();        // 左右对应：落点偏左 → 爱心左半，偏右 → 右半（避免粒子横穿屏幕）
+    recomputeOrders(heart);   // 重算几何序（含凹口序）+ 全局数量均匀序
+
+    // （曾尝试回退成「全部同时自由飞回」的早期方式，观感不如排队版，已撤销）
+    // 尖端收笔：小尾巴最底端那一小撮（几何上极度密集），无论怎么连续映射 order，
+    // 最末一小撮都会挤在同一两帧 → 像「一帧生成」。
+    // 解决：把这批粒子单独挑出，按「高度(hy)由小到大」排序后，逐个等间隔分配独立时间槽，
+    // 铺在主体收尾之后的 [tipStart, tipStart+TIP_FRAMES] 时间窗内。
+    // 排序用「由小到大」：hy 最大的（真正最底端）最后收笔 →
+    // 「最后出现的那颗」正好落在小尾巴最下面一点，而不是尾巴中间。
+    const TIP_HY = 19.0;                      // 收笔高度阈值：hy 大于它的粒子进入「最底端收笔」组
+    const TIP_FRAMES = 42;                    // 收笔时间窗（帧）：约 0.7s，逐颗描出最末一点
+
+    // ---- 起飞节奏：起步零星几颗 → 几何倍数扩增 → 达到匀速后不再变化 ----
+    // 原来是 base = order * REFORM_SPREAD，严格匀速（每帧约 54 颗），起步就成片上升。
+    // 改成「累积颗数 n → 起飞帧」：前段每帧起飞数按 GROWTH 逐帧翻增，达到 BASE_RATE 后转回
+    // 原来的匀速。后段斜率 = BASE_RATE 与原逻辑完全一致 → 左右瓣、尖底的形成过程不受影响。
+    const TOTAL_N = heart.length;
+    const BASE_RATE = TOTAL_N / REFORM_SPREAD;      // 原匀速速率（颗/帧，约 54）
+    const START_RATE = 2.2;                          // 起步：每帧只飞起这么几颗
+    const GROWTH = 1.06;                             // 几何倍率（每帧起飞量 ×1.06）
+    const LG = Math.log(GROWTH);
+    const SWITCH_N = (BASE_RATE - START_RATE) / LG;  // 转成匀速时的累积颗数（前段到此为止）
+    const SWITCH_T = Math.log(BASE_RATE / START_RATE) / LG;   // 对应的帧号
+    const launchFrame = n => n <= 0 ? 0 : (n < SWITCH_N
+      ? Math.log(1 + n * LG / START_RATE) / LG      // 前段：指数（起飞数逐帧翻增）
+      : SWITCH_T + (n - SWITCH_N) / BASE_RATE);     // 后段：恢复原匀速
+    let tipIdx = null, tipN = 1, tipStartFrame = 0;
+    if (FORMATION === 'notch') {          // 收笔组只属于 notch 序（底端最后）；bottom 序下底端最先，无需收笔
+      const tipList = heart.filter(p => p.hy > TIP_HY);
+      tipList.sort((a, b) => a.hy - b.hy);    // hy 小的先（尾巴中上），hy 大的最后（最底端）→ 收笔落在最底端
+      tipIdx = new Map(); tipN = Math.max(1, tipList.length - 1);
+      for (let i = 0; i < tipList.length; i++) tipIdx.set(tipList[i], i);   // 预建索引，避免循环内 indexOf
+      // 收笔起点：取收笔组里最小的 order（保证与主体线性顺序无缝衔接，不留空档）
+      let minO = Infinity;
+      for (const p of tipList) if (p.order < minO) minO = p.order;
+      tipStartFrame = launchFrame(minO * TOTAL_N);   // 与主体同一套节奏，衔接不留空档
+    }
+    // 步骤1：算出每颗粒子的「起飞优先级」= base - flight
+    //   base  沿用原线性顺序（order × REFORM_SPREAD）
+    //   flight 是飞行时间补偿：只按「垂直距离」算（与横向位置无关）——保证同高度中央与俩侧同步收尾；
+    //          权重削弱（/14）让 order 主导顺序，避免远处粒子靠补偿抢跑。
+    //          烟花碎片停在屏幕外，补偿上限放宽到 130，否则它们会集体迟到、收尾拖长。
+    const priArr = [];
+    for (const p of heart) {
+      const ty = CY + p.hy * S * p.depth;
+      const flight = Math.min(p.fw ? 130 : 55, Math.abs(ty - p.y) / 14.0 + 8);
+      const isTip = tipIdx ? tipIdx.has(p) : false;
+      const base = isTip
+        ? tipStartFrame + (tipIdx.get(p) / tipN) * TIP_FRAMES
+        : p.order * REFORM_SPREAD;
+      priArr.push({ p, pri: base - flight, isTip });
+    }
+    // 步骤2：主体按优先级排出名次，再用 launchFrame 按名次重新分配起飞帧。
+    //   直接拿 base-flight 当时间会被 ±55 帧的补偿打乱出空档，改成「排名次 → 套曲线」后，
+    //   起飞速率就严格等于 launchFrame 的曲线，同时完整保留「远处先飞」的相对顺序。
+    const mainArr = priArr.filter(o => !o.isTip).sort((a, b) => a.pri - b.pri);
+    for (let i = 0; i < mainArr.length; i++) mainArr[i].p.reformWait = launchFrame(i);
+    // 步骤3：收笔粒子接在主体之后，仍按 hy 逐颗描出最末一点
+    const tipArr = priArr.filter(o => o.isTip).sort((a, b) => tipIdx.get(a.p) - tipIdx.get(b.p));
+    const tipBase = launchFrame(mainArr.length);
+    for (let i = 0; i < tipArr.length; i++) tipArr[i].p.reformWait = tipBase + (i / tipN) * TIP_FRAMES;
+    for (const p of heart) p.locked = false;
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    swiping = true; lastX = downX = e.clientX; lastY = downY = e.clientY;
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}   // 手指移出画布也持续收到事件
+    // 爱心未成型前不创建轨迹 → 不会出现划痕
+    stroke = heartReady ? { pts: [{ x: lastX, y: lastY, t: performance.now() }], lastT: performance.now() } : null;
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!swiping) return;
+    const x = e.clientX, y = e.clientY;
+    const dx = x - lastX, dy = y - lastY, len = Math.hypot(dx, dy) || 1;
+    swipeDX = dx / len; swipeDY = dy / len;
+    // 只有爱心完全成型后才记录轨迹（出现划痕）并允许切中；未成型时划动无任何痕迹
+    if (heartReady && stroke) {
+      stroke.pts.push({ x, y, t: performance.now() });
+      stroke.lastT = performance.now();   // 刷新寿命计时，划动中整条始终完整显示
+      // 从按下点到当前点划出足够距离才算「切」，几像素的点击抖动不会误切
+      if (!fwActive && Math.hypot(x - downX, y - downY) >= MIN_CUT && cutHitsHeart(lastX, lastY, x, y)) scatter(swipeDX, swipeDY);
+    }
+    lastX = x; lastY = y;
+  });
+  window.addEventListener('pointercancel', () => { swiping = false; });   // 手势被系统接管时安全收尾
+  window.addEventListener('pointerup', e => {
+    swiping = false;
+    // 位移未达切割距离 → 一律算轻点（点击抖动也有反馈，绝不误切）
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) < MIN_CUT) {
+      if (fwActive) { endNight(); return; }   // 烟花释放期间点击 → 立即结束烟花，随后自动切割+重聚
+      if (!heartReady) return;                                    // 爱心未成型：轻点不迸发粒子
+      // 已散落 → 必须等全部颗粒落定（躺在屏幕底下 / 烟花飞出屏幕）才允许复原；
+      // 未落定时点击只迸发一小簇火星做「已收到点击」的反馈，不打断坠落过程
+      if (scattered) {
+        if (allSettled()) { reform(); fwAutoReform = false; return; }
+        for (let i = 0; i < 26; i++) {
+          const a = Math.random() * Math.PI * 2, sp = rand(0.6, 2.4), c = pinkStyle();
+          sparks.push({ x: e.clientX, y: e.clientY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.6,
+            life: 0, maxLife: rand(20, 45), size: rand(0.4, 0.9), r: c.r, g: c.g, b: c.b });
+        }
+        return;
+      }
+      for (let i = 0; i < 180; i++) {                             // 否则迸发一簇粒子
+        const t = Math.random() * Math.PI * 2;
+        const px = CX + ox + heartX(t) * gScale, py = CY + oy + heartY(t) * gScale;
+        const ang = Math.atan2(py - CY, px - CX) + rand(-0.5, 0.5);
+        const sp = rand(2, 7), c = pinkStyle();
+        sparks.push({ x: px, y: py, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 1.5,
+          life: 0, maxLife: rand(50, 110), size: rand(0.4, 1.2), r: c.r, g: c.g, b: c.b });
+      }
+    }
+  });
+  window.addEventListener('pointercancel', () => { swiping = false; });
+
+  /* ---------- 主循环 ---------- */
+  let last = performance.now();
+  let frame = 0;
+  let ox = 0, oy = 0;   // 整颗爱心的轻微漂移偏移（左右上下）
+  let spawnEase = 0, spawnAcc = 0;   // 起步渐增：喷洒速率从「零星几颗」平滑升到满速
+  let reforming = false, reformEase = 0;   // 复原起步渐增：起飞速率从「零星几颗」平滑升到满速
+  let BEAT = false;                  // 心脏跳动开关（默认关闭）：成型后也不跳，除非手动开启
+  let gScale = S;                    // 当前帧实际缩放（供轻点迸发定位用）
+  let prevBeat = 0;                  // 心跳上升沿检测：用于触发迸发
+
+  // 丝滑漂移：连续正弦，无量化台阶，频率适中（移动比之前更快）
+  // 「爱心正面」= 完全静止（ox/oy 归零，整颗心一动不动）；只有自转/摆动姿态才漂移。
+  // driftEase 做平滑过渡 → 切换姿态时不会瞬移跳一下
+  let driftEase = 0;                 // 0=静止 → 1=满幅漂移
+  function driftOffset(now, dt) {
+    const want = (HEART_POSE === 'front') ? 0 : 1;
+    driftEase += (want - driftEase) * Math.min(1, dt * 0.04);
+    if (driftEase < 0.002) { ox = 0; oy = 0; driftEase = 0; return; }   // 正面：彻底归零
+    ox = (Math.sin(now * 0.00034) * 44 + Math.sin(now * 0.0007 + 1.3) * 27) * driftEase;   // 左右最大约 ±71px
+    oy = (Math.sin(now * 0.0004 + 2.1) * 35 + Math.sin(now * 0.0008 + 0.4) * 23) * driftEase; // 上下最大约 ±58px
+  }
+
+  function loop(now) {
+    const dt = Math.min((now - last) / 16.67, 3);
+    last = now; frame++;
+    // 球型模式：确保发光球贴图已构建（初始化 / 默认 sphere 时可能未触发 buildSphereSprites）
+    if (PARTICLE_STYLE === 'sphere' && sphereSprites.length === 0) buildSphereSprites();
+    // 形状切换兜底：点击按钮只记 pendingShape，这里在「已成型且未散落」时自动消费。
+    // 这样无论用户在何时点击（含刚加载/重聚尚未成型的瞬间），形状都会可靠生效，不会因
+    // 点击那一刻 heartReady 为 false 而被丢弃（之前只在点击瞬间判断，导致判定前点击不生效）。
+    if (pendingShape !== null && heartReady && !scattered) applyShapeImmediate();
+
+    // 纯色切黑（夜空）时：不透明黑清屏 → 彻底去除爱心拖尾/虚影；其它颜色保持 0.36 拖尾观感
+    if (fwAutoReform && scattered && allSettled()) { reform(); fwAutoReform = false; }
+    const fwBlack = SOLID && Math.max(COL_SOLID.r, COL_SOLID.g, COL_SOLID.b) < 28;
+    ctx.fillStyle = fwBlack ? '#000' : 'rgba(0, 0, 0, 0.36)';
+    ctx.fillRect(0, 0, W, H);
+
+    // 比耶 ✌ 触发的流星雨（离屏透明层，最底层背景；一阵放完自动停，不影响爱心拖尾）
+    if (meteorCool > 0) meteorCool--;
+    if (meteorTimer > 0) meteorTimer--;
+    if (meteorActive) {
+      if (meteorTimer <= 0 && meteors.length === 0 && flares.length === 0) meteorActive = false;
+      else { meteorUpdateDraw(); ctx.drawImage(meteorCanvas, 0, 0, W, H); }
+    }
+
+    // 心跳仅在爱心完全成型且未散落时才生效：首生成 / 切割散落 / 复原过程中尺寸恒定、不跳动、不喷粒子
+    const scaleNow = (BEAT && heartReady && !scattered) ? S * (1 + heartbeat(now) * 0.18) : S;
+    driftOffset(now, dt);   // 更新整颗爱心的漂移偏移（正面姿态下为 0 → 静止）
+    if (HEART_POSE === 'sway') {                            // 爱心摆动：在漂移基础上叠加轻微左右/上下摆动
+      ox += Math.sin(now * 0.0006) * 20;
+      oy += Math.cos(now * 0.0009 + 1.1) * 14;
+    }
+    gScale = scaleNow;
+
+    // 沙尘暴（后方层）：先画，随后被实心爱心遮挡 → 形成「绕到爱心后面」的 3D 穿插（z<0）
+    if (sandActive) {
+      if (heartReady && !scattered) sandFade = Math.max(0, sandFade - dt / 60);   // 聚合完成 → 缓淡出（约1s）
+      else if (scattered) sandFade = Math.max(0, sandFade - dt / 14);             // 又被切 → 快速散去
+      if (sandFade <= 0) { sandActive = false; sand.length = 0; }
+      if (HEART_POSE === 'spin' && sandActive) sandSpin += 0.012 * dt; else sandSpin = 0;
+      updateSand(dt);
+      drawSandBatch(-1e9, 0);   // 后方粒子（z<0）：先画，被爱心遮
+    }
+
+    // 成型 + 未散落 + 开启心跳：每次心跳脉冲（咚-哒）从轮廓向外迸发一簇粒子（夜空模式跳过，避免黑底上冒粉点）
+    if (BEAT && heartReady && !scattered && !fwBlack) {
+      const bv = heartbeat(now);
+      if (prevBeat <= 0.5 && bv > 0.5) beatBurst(scaleNow);   // 上升沿触发一次迸发
+      prevBeat = bv;
+    } else {
+      prevBeat = 0;
+    }
+
+    // 首次生成：仍从底部喷洒粒子上升（原观感），但「归位先后」按聚合的「由中间向俩侧」order 排布
+    if (!scattered && heart.length < HEART_N) {
+      spawnEase = Math.min(1, spawnEase + dt / 40);                 // 0→1，约 40 帧（0.7s）走完（更快进入满速）
+      const ease = spawnEase * spawnEase * (3 - 2 * spawnEase);     // smoothstep，起止更顺
+      const rate = 1 + (72 - 1) * ease;                            // 1 颗/帧 → 72 颗/帧（生成速率加快）
+      spawnAcc += rate;
+      while (spawnAcc >= 1 && heart.length < HEART_N) { heart.push(makeHeart(heart.length)); spawnAcc -= 1; }
+    }
+
+    // 心形主体：未散落时飘散/锁定（带微抖，跟随心跳缩放）；散落后变为自由落体碎片
+    // 复原起步渐增：起飞速率先慢后快（约 1s 从 0.1 倍速升到满速），避免一开场大批粒子齐飞
+    let reformSpeed = 1;
+    if (reforming) {
+      reformEase = Math.min(1, reformEase + dt / 30);                 // 约 30 帧（0.5s）走完渐增
+      const e = reformEase * reformEase * (3 - 2 * reformEase);
+      reformSpeed = 0.62 + 0.38 * e;                                 // 0.62 倍速起步（更密，避免开场流太细）→ 1 倍速
+    }
+    // 爱心姿态：spin 模式整颗心绕 Y 轴 3D 自转（前后穿插立体）；front/sway 不转（按原序绘制）
+    const POSE = HEART_POSE;
+    if (POSE === 'spin') {
+      spinAngle += dt * SPIN_SPEED;             // 自转角累加（与沙暴同向，整体感更强）
+      if (pendingPose !== null) {              // 自转中切到「正面/摆动」：先转到正面（最多半圈）再切换
+        if (spinAngle >= pendingFront) {       // 已转到锁定的「正面」角（|cosA|=1，满宽面向观众）→ 应用待生效姿态
+          HEART_POSE = pendingPose;
+          pendingPose = null;
+          spinAngle = 0;                       // 重置自转角：正面/摆动从干净状态开始，避免突跳
+          for (const p of heart) p.st = null;
+        }
+      }
+    }
+    const cosA = Math.cos(spinAngle), sinA = Math.sin(spinAngle);
+    const focal = 72 * S;                                          // 透视焦距（与沙暴一致，深度感统一）
+    // 首次生成的尾巴慢收尾：与聚合 end-ramp 同源 —— 已归位超 85% 后，仍在等待的（都是尖端）延迟倒计时减速
+    let lockedCount = 0; for (const p of heart) if (p.locked) lockedCount++;
+    let tailForm = 1;
+    if (FORMATION === 'notch' && lockedCount / HEART_N > 0.85) {
+      tailForm = 1 - 0.85 * ((lockedCount / HEART_N - 0.85) / 0.15);
+    }
+    // 收尾前（90% 已归位）提前淡出背景粒子球体 → 缩短"满心 + 背景球"同屏的绘制峰值，弱机末段更稳
+    // 收尾前（90% 已归位）提前淡出背景粒子球体：仅球型模式加快淡出，颗粒模式保持原速 → 颗粒重聚不受本轮改动影响
+    if (reforming && lockedCount / HEART_N > 0.9) sandFade = Math.max(0, sandFade - dt / (PARTICLE_STYLE === 'sphere' ? 60 : 90));
+    let pending = 0;                 // 尚未归位的粒子数
+    // ---- 阶段1：物理更新 + 计算每颗屏幕位置/亮度/绘制参数（暂不绘制） ----
+    for (const p of heart) {
+      if (p.delay > 0 || p.reformWait > 0) pending++;   // 复原排队中的也属「未归位」→ 复原期间不可切割
+      if (scattered) {
+        fall(p, dt);
+        p._z3 = 0; p._sc = 1;
+      } else {
+        // 目标位置：spin 模式经 3D 绕 Y 轴旋转 + 透视投影；否则普通 2D
+        let tx, ty;
+        if (POSE === 'spin') {
+          const lx = p.hx * scaleNow * p.depth, ly = p.hy * scaleNow * p.depth;
+          const rz = lx * sinA;                  // 深度（前+ 后-）
+          const rx = lx * cosA;
+          const sc = focal / (focal - rz);
+          tx = CX + ox + rx * sc;
+          ty = CY + oy + ly * sc;
+          p._z3 = rz; p._sc = sc;
+        } else {
+          tx = CX + ox + p.hx * scaleNow * p.depth;
+          ty = CY + oy + p.hy * scaleNow * p.depth;
+          p._z3 = 0; p._sc = 1;
+        }
+        p._tx = tx; p._ty = ty;          // 记录本帧目标（探针/调试用，无副作用）
+        if (p.reformWait > 0) {
+          // 复原排队中：继续按碎片物理落稳在地上（不僵在空中），轮到自己的顺序号才起飞
+          p.reformWait -= dt * reformSpeed;
+          fall(p, dt);
+          // 起飞：轻微上冲，随后淡入。同时退出烟花模式（绽放结束，改走常规飞行物理与绘制）
+          if (p.reformWait <= 0) { p.fade = 12; p.vy = -rand(0.4, 1.2); p.fw = false; }
+        } else if (p.delay > 0) {
+          // 待命：粒子停在屏幕下方「看不见」处、随屏幕滚动轻微摆动，绝不上升、绝不出现。
+          p.delay -= dt * tailForm;
+          p.vx += Math.sin(now * 0.0012 + p.ph) * 0.02 * dt;
+          p.vx *= 0.99;
+          p.x += p.vx * dt;                          // 仅横向轻摆，纵向不动（始终留在屏幕下方）
+          p.y = H + 8 + Math.sin(now * 0.002 + p.ph) * 4;
+          if (p.x < -SPRAY_R) { p.x = -SPRAY_R; p.vx = Math.abs(p.vx); }
+          else if (p.x > W + SPRAY_R) { p.x = W + SPRAY_R; p.vx = -Math.abs(p.vx); }
+          if (p.delay <= 0) p.vy = -rand(2, 5);
+        } else if (p.locked) {
+          // 已锁定：刚性跟随主干。beat/spin/sway 让目标每帧大幅变化，仍走下方飞行分支会因瞬时位移>6px
+          // 被降级成惯性飞行、追不上主干而脱节 → 锁定后直接贴合目标+微抖，动作再剧烈也不脱钩。
+          // （球型在此额外累计 settle 计时供绘制端收尾缓动；颗粒不进收尾缓动，跳过）
+          p.fade = 26;
+          p.x = tx + Math.sin(now * 0.003 + p.ph) * p.jit;
+          p.y = ty + Math.cos(now * 0.0035 + p.ph) * p.jit;
+          if (PARTICLE_STYLE === 'sphere' && p.settle < 999) p.settle += dt;
+        } else if (PARTICLE_STYLE === 'sphere' && p.landing) {
+          // 落地缓冲（仅球型）：平滑插值到目标、各自 landHold 帧后才真正锁定 → 打散尾部成批台阶。
+          // 颗粒不进此分支（直接 d≤6 锁定），故颗粒重聚观感受球型卡顿修复零影响。
+          p.fade = 26;
+          if (p.settle < 999) p.settle += dt;
+          p.landT += dt;
+          p.x += (tx - p.x) * 0.3 * dt + Math.sin(now * 0.003 + p.ph) * p.jit;
+          p.y += (ty - p.y) * 0.3 * dt + Math.cos(now * 0.0035 + p.ph) * p.jit;
+          if (p.landT >= p.landHold) { p.locked = true; p.landing = false; }
+        } else {
+          p.fade += dt;
+          const d = Math.hypot(tx - p.x, ty - p.y);
+          if (PARTICLE_STYLE === 'sphere') {
+            // 球型：临界阻尼弹簧（ζ=1 无过冲、平滑滑入、刚度更低→更慢），消除尾部"冲过头又弹回"抖动
+            if (d > LOCK_DIST) {
+              const k = 0.009, c = 2 * Math.sqrt(k), VMAX = 4.0;
+              p.vx += ((tx - p.x) * k - c * p.vx) * dt;
+              p.vy += ((ty - p.y) * k - c * p.vy) * dt;
+              const sp = Math.hypot(p.vx, p.vy);
+              if (sp > VMAX) { p.vx *= VMAX / sp; p.vy *= VMAX / sp; }
+              p.x += p.vx * dt; p.y += p.vy * dt;
+            } else {
+              p.landing = true; p.landT = 0; p.landHold = Math.random() * LAND_SPREAD; p.settle = 0;
+            }
+          } else {
+            // 颗粒：原始欠阻尼弹簧 + d≤6 直接锁定（保留用户认可的颗粒重聚观感，不被球型修复改动）
+            const SPRING = 0.014, DAMP = 0.92, VMAX = 5.5;
+            p.vx += (tx - p.x) * SPRING * dt;
+            p.vy += (ty - p.y) * SPRING * dt;
+            p.vx *= DAMP; p.vy *= DAMP;
+            const sp = Math.hypot(p.vx, p.vy);
+            if (sp > VMAX) { p.vx *= VMAX / sp; p.vy *= VMAX / sp; }
+            p.x += p.vx * dt; p.y += p.vy * dt;
+            if (d <= 6) p.locked = true;     // 原始颗粒锁定判定：位置已很近即锁（无 landing、无错峰）
+          }
+        }
+      }
+      // 亮度：飘散时很淡，归位后逐渐变清晰（上限按类型：尘带 0.85 / 内部 0.52 / 雾点更低）
+      const s = p.size * 1.8;
+      let a;
+      if (p.delay <= 0 && p.reformWait <= 0 && p.fade >= 26 && p.st !== null) {
+        p._st = p.st;                         // 已达最终亮度：复用缓存
+        a = p._a;                             // 沿用上次算好的透明度（最终亮度后不再变化）
+      } else {
+        if (p.reformWait > 0) {
+          if (reforming) {
+            p.fade = Math.max(0, p.fade - dt * 4);
+            a = Math.max(0.16, 0.32 * Math.min(1, p.fade / 26));
+          } else {
+            a = 0.32;
+          }
+        } else if (p.delay > 0) {
+          a = 0.12;
+        } else {
+          a = 0.12 + (p.aMax - 0.12) * Math.min(1, p.fade / 26);
+        }
+        if (POSE === 'spin' && p._z3 < 0) a *= 0.55;   // spin 模式：后方粒子更暗 → 强化立体纵深
+        const st = `rgba(${p.r},${p.g},${p.b},${a})`;
+        if (p.delay <= 0 && p.reformWait <= 0 && p.fade >= 26) p.st = st;
+        p._st = st;
+        p._a = a;                             // 记录本帧透明度：球型绘制（globalAlpha）要用
+      }
+      p._sx = p.x; p._sy = p.y;
+      p._sz = s * (POSE === 'spin' ? p._sc : 1);   // spin 模式：近大远小
+      // 本帧位移 → 运动拖尾方向；随后把当前位置记为「上一帧」，供下一帧求位移
+      p._dx = p.x - p.px; p._dy = p.y - p.py;
+      p.px = p.x; p.py = p.y;
+      if (PARTICLE_STYLE === 'sphere') {
+        // 彗星模式不需要 band 索引（直接用粒子颜色绘制）
+      }
+    }
+    // ---- 阶段2：绘制（spin 模式按深度 z 升序：远先画、近后画，形成前后遮挡立体） ----
+    const drawList = (POSE === 'spin') ? heart.slice().sort((a, b) => a._z3 - b._z3) : heart;
+    if (PARTICLE_STYLE === 'sphere') {
+      // ---- 球体 + 彩带拖尾：改用 source-over 正常混合 ----
+      // （原 lighter 叠加会让数百条半透明彩带颜色累加到过曝、边界糊成一片，这也是"太亮"的根因）
+      ctx.globalCompositeOperation = 'source-over';
+      for (const p of drawList) {
+        if (p.delay > 0) continue;                          // 还没起飞的不画
+        // 烟花碎片飞出屏幕后即定格（vx=vy=0）→ 直接跳过，不白画上千条看不见的彩带。
+        // （此时它位移为 0、拖尾长 0，本来也只剩一个球，剔掉不影响观感）
+        if (p.fw && p.vx === 0 && p.vy === 0) continue;
+        if (p._sx < -80 || p._sx > W + 80 || p._sy < -80 || p._sy > H + 80) continue;   // 远在屏幕外的不画
+        const cl = v => v < 0 ? 0 : (v > 255 ? 255 : v);
+        let cr, cg, cb, a;
+        if (p.locked || p.landing) {
+          // 稀疏透气：球型轮廓粒子约 45% 确定性跳过(按 p.ph) → 边缘留白、不显实；颗粒不受影响
+          if (p.outline && Math.sin(p.ph * 1.7 + 1.0) < -0.2) continue;
+          const e = p.settle < LOCK_EASE ? Math.min(1, p.settle / LOCK_EASE) : 1;
+          if (e < 1) {
+            // 收尾缓动（廉价 arc）：尺寸 2.6→0.55、亮度 0.62→0.4 平滑收成小圆点。
+            // 起点对齐飞行态(彗星 2.6 大球)与彗星亮度(0.62) → 消除"2.6 大球骤缩 1.8 / 突然变暗"的台阶
+            // landing 期间已在走此分支（错峰），故成批锁定无台阶、位置无硬跳。
+            const R = p._sz * (2.6 * (1 - e) + 0.55 * e);
+            ctx.save();
+            ctx.globalAlpha = p._a * (0.62 - 0.22 * e);     // 0.62(彗星) → 0.4(密实小点)，亮度平滑收
+            ctx.fillStyle = `rgb(${cl(p.r)},${cl(p.g)},${cl(p.b)})`;
+            ctx.beginPath(); ctx.arc(p._sx, p._sy, R, 0, 6.283); ctx.fill();
+            ctx.restore();
+            continue;
+          }
+          // ---- 已归位（稳态）：全部粒子参与（不受抽样限制）→ 爱心饱满不稀疏 ----
+          // 球直径需接近颗粒(≈_sz)而非 2×_sz，亮度也压低 → 13000 颗密集排列才不糊成一片
+          // 轮廓粒子略小略淡 → 边缘透气（稀疏通气），内部保持密实
+          const s = p._sz * (p.outline ? 0.48 : 0.55);
+          cr = cl(p.r); cg = cl(p.g); cb = cl(p.b);
+          a = p._a * (p.outline ? 0.5 : 0.4);
+          // 稳态 fillStyle 恒定（颜色/透明度不变）→ 缓存，省每帧上万次字符串拼接+解析的 GC 压力（视觉零变化）
+          if (p._fr !== p.r || p._fg !== p.g || p._fb !== p.b || p._fa !== a) {
+            p._fr = p.r; p._fg = p.g; p._fb = p.b; p._fa = a;
+            p._fill = `rgba(${cr},${cg},${cb},${a})`;
+          }
+          ctx.fillStyle = p._fill;
+          ctx.beginPath(); ctx.arc(p._sx, p._sy, s, 0, 6.283); ctx.fill();
+          continue;                                        // 归位粒子到此结束，不走抽样
+        }
+        // ---- 以下仅飞行中的粒子：抽样（少而大）----
+        // ---- 散落态 / 复原排队中（非烟花）：碎片画小圆点，保持底部碎片层密实 ----
+        // 复原排队期间（reformWait>0）scattered 已置 false，但粒子还堆在地上 → 同样要兜底。
+        if (!p.fw && (scattered || p.reformWait > 0)) {
+          const sr = p._sz * 0.6;                       // 直径略大于颗粒方块 → 碎片层密实不空
+          cr = cl(p.r); cg = cl(p.g); cb = cl(p.b);
+          ctx.fillStyle = `rgba(${cr},${cg},${cb},${p._a * 0.75})`;   // 接近颗粒亮度 → 一地碎片清晰可辨
+          ctx.beginPath(); ctx.arc(p._sx, p._sy, sr, 0, 6.283); ctx.fill();
+          continue;
+        }
+        // 烟花绽放 / 飞行归位：抽样（少而大）。烟花比飞行密一些 → 绽放更有量感
+        // 烟花再按起爆方向分档：向上飞的更密（上方烟瓣厚 + 落下来是流星），朝下的略疏。
+        // 分档依据 p.fwUp 在爆炸瞬间已定死 → 同一颗粒子全程可见性不变，不会闪烁。
+        if (p.idx % (p.fw ? (p.fwUp ? SPHERE_FW_STRIDE_UP : SPHERE_FW_STRIDE_DOWN) : SPHERE_STRIDE) !== 0) continue;
+        const spd = Math.hypot(p._dx, p._dy);
+        if (p.fw) {   // 烟花绽放：预渲染柔光球 sprite 直接 drawImage（硬件纹理拷贝，零路径/零 trig → 手机高刷屏流畅）+ 实色短拖尾
+          const R = p._sz * 1.8;                      // 发光球可视半径（含柔光晕）
+          if (spd > 0.08) {                          // 有速度才画拖尾（手算 4 顶点，便宜）
+            const ang = Math.atan2(p._dy, p._dx);
+            const ca = Math.cos(ang), sa = Math.sin(ang);
+            const tl = Math.min(spd * 8, 170);       // 烟瓣拖尾加长（约 1.9×）：绽放后丝带更长、花瓣延展感更强
+            const hw = R * 0.5, tw = hw * 0.22;       // 头半宽 / 尾半宽（尾部略收窄 → 瓣形更尖更长）
+            const nx = -sa, ny = ca;                 // 法向
+            const tx = p._sx - ca * tl, ty = p._sy - sa * tl;
+            ctx.fillStyle = `rgba(${cl(p.r)},${cl(p.g)},${cl(p.b)},${p._a * 0.55})`;
+            ctx.beginPath();
+            ctx.moveTo(p._sx + nx * hw, p._sy + ny * hw);
+            ctx.lineTo(tx + nx * tw, ty + ny * tw);
+            ctx.lineTo(tx - nx * tw, ty - ny * tw);
+            ctx.lineTo(p._sx - nx * hw, p._sy - ny * hw);
+            ctx.closePath(); ctx.fill();
+          }
+          // 柔光球：直接 drawImage 预渲染 sprite（白核 + 渐隐光晕，天然就是烟花光点）
+          const band = (p.hy - HY_TOP) / (HY_BOT - HY_TOP) * (SPHERE_BANDS - 1);
+          const sp = sphereSprites[band < 0 ? 0 : (band > SPHERE_BANDS - 1 ? SPHERE_BANDS - 1 : band | 0)];
+          if (sp) ctx.drawImage(sp, p._sx - R, p._sy - R, R * 2, R * 2);
+          else {   // 防御：sprite 未就绪时退回 arc 画发光球（不崩、仍有球）
+            ctx.fillStyle = `rgba(${cl(p.r + (255 - p.r) * 0.45)},${cl(p.g + (255 - p.g) * 0.45)},${cl(p.b + (255 - p.b) * 0.45)},${p._a * 0.72})`;
+            ctx.beginPath(); ctx.arc(p._sx, p._sy, R * 0.62, 0, 6.283); ctx.fill();
+          }
+          continue;
+        }
+        const s = p._sz * 2.6;   // 飞行归位：球略大，保留丝绸彩带质感
+        {
+          // ---- 飞行中：颜色加重的大球 + 彩带拖尾 ----
+          const angle = spd > 0.08 ? Math.atan2(p._dy, p._dx) : 0;
+          // 烟花速度很高（初速最高 26），若沿用 spd*9 会拉出 200px+ 的尾巴糊成一片 → 单独限长
+          const trailLen = p.fw ? Math.min(spd * 5, 110) : Math.max(s * 8, spd * 9);
+          const lum = 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
+          // 饱和度适度(2.2) + 明度提高(1.18)：颜色更鲜艳明亮，同时避免通道被压到 0 导致失真（更自然）
+          const k = 2.2;
+          // 饱和度适度(2.2) + 明度提高(1.18)：鲜艳明亮，避免通道被压到 0 而失真
+          cr = cl(Math.round((lum + (p.r - lum) * k) * 1.18));
+          cg = cl(Math.round((lum + (p.g - lum) * k) * 1.18));
+          cb = cl(Math.round((lum + (p.b - lum) * k) * 1.18));
+          a = p._a * 0.62;                                    // source-over 下补偿不透明度（不再靠叠加提亮）
+          ctx.save();
+          ctx.translate(p._sx, p._sy);
+          ctx.rotate(angle);
+          // ---- 彩色飘带（彩带质感）：正弦摆动 + 扭转 + 中心光泽带 ----
+          // 起始半宽 = 1.25s → 拖尾更宽；球体纵向半轴同步为 1.25s 保持衔接无台阶
+          const ribbonW = s * 0.92;
+          const phase = now * 0.004 + p.idx * 0.6;      // 每颗飘带独立相位 → 各自飘动
+          const waveAmp = s * 1.1;                       // 摆动幅度
+          const pr = cl(cr * 1.0), pg2 = cl(cg * 0.72), pb = cl(cb * 1.18);
+          // 扭转：模拟丝带翻转。× t 使 t=0 时扭转量为 0 → 起点宽度精确等于球体直径，衔接平滑
+          const twist = t => 1 - 0.5 * Math.abs(Math.sin(t * 2.7 + phase * 0.5)) * t;
+          // 飘带路径构建（wMul=宽度倍率，供底层/光泽层复用）
+          const SEGS = 11;
+          const buildRibbon = wMul => {
+            ctx.beginPath();
+            for (let i = 0; i <= SEGS; i++) {            // 上边：头 → 尾
+              const t = i / SEGS;
+              const x = -trailLen * t;
+              const w = ribbonW * (1 - t * 0.5) * twist(t) * wMul;
+              const y = Math.sin(t * 3.6 + phase) * waveAmp * t;
+              if (i === 0) ctx.moveTo(x, y - w); else ctx.lineTo(x, y - w);
+            }
+            for (let i = SEGS; i >= 0; i--) {            // 下边：尾 → 头
+              const t = i / SEGS;
+              const x = -trailLen * t;
+              const w = ribbonW * (1 - t * 0.5) * twist(t) * wMul;
+              const y = Math.sin(t * 3.6 + phase) * waveAmp * t;
+              ctx.lineTo(x, y + w);
+            }
+            ctx.closePath();
+          };
+          // ---- 底层：飘带本体（彩色渐变：粉 → 紫 → 洋红 → 淡出）----
+          const grd = ctx.createLinearGradient(s * 0.5, 0, -trailLen, 0);
+          grd.addColorStop(0.00, `rgba(${cr},${cg},${cb},${a})`);
+          grd.addColorStop(0.18, `rgba(${cr},${cg},${cb},${a * 0.72})`);
+          grd.addColorStop(0.45, `rgba(${pr},${pg2},${pb},${a * 0.44})`);
+          grd.addColorStop(0.72, `rgba(${pr},${pg2},${pb},${a * 0.14})`);
+          grd.addColorStop(0.90, `rgba(${pr},${pg2},${pb},${a * 0.03})`);
+          grd.addColorStop(1.00, `rgba(${pr},${pg2},${pb},0)`);
+          ctx.fillStyle = grd;
+          buildRibbon(1.0);
+          ctx.fill();
+          // 球体本体：圆头、后端圆弧 → 头部圆润无平切棱角（消除马赛克/方块感），后端与拖尾等宽衔接
+          ctx.fillStyle = `rgba(${cr},${cg},${cb},${a})`;
+          const hw = s * 0.92;                   // 纵向半轴（= ribbonW，与拖尾对齐）
+          const fx = s * 0.80;                   // 前端最凸点（圆头顶点）
+          const fw = hw * 0.80;                  // 前端半宽（圆头更饱满）
+          ctx.beginPath();
+          ctx.moveTo(fx, -fw);                                          // 圆头顶端（上）
+          ctx.quadraticCurveTo(fx - s * 0.6, -fw, fx - s * 0.5, -hw);   // 上侧：圆头 → 最宽处
+          ctx.quadraticCurveTo(-s * 1.18, 0, fx - s * 0.5, hw);         // 后端圆弧收拢
+          ctx.quadraticCurveTo(fx - s * 0.6, fw, fx, fw);               // 下侧：最宽处 → 圆头底端
+          ctx.quadraticCurveTo(fx + s * 0.5, 0, fx, -fw);              // 圆头顶端：向前凸的圆弧闭合（无平切）
+          ctx.closePath();
+          ctx.fill();
+          // ---- 光泽层：中心细亮带（丝绸/彩带的高光质感）----
+          // 画在球体之后 → 高光贯穿球体与拖尾，整条彩带光泽连续（source-over 下顺序决定覆盖）
+          const sr = cl(cr + (255 - cr) * 0.4), sg = cl(cg + (255 - cg) * 0.4), sb = cl(cb + (255 - cb) * 0.4);
+          const grdS = ctx.createLinearGradient(s * 0.5, 0, -trailLen, 0);
+          // 起始亮度降低 → 球体处不过亮，与拖尾衔接处色调一致（像一条均匀的彩带）
+          grdS.addColorStop(0.00, `rgba(${sr},${sg},${sb},${a * 0.5})`);
+          grdS.addColorStop(0.25, `rgba(${sr},${sg},${sb},${a * 0.32})`);
+          grdS.addColorStop(0.55, `rgba(${sr},${sg},${sb},${a * 0.14})`);
+          grdS.addColorStop(1.00, `rgba(${sr},${sg},${sb},0)`);
+          ctx.fillStyle = grdS;
+          buildRibbon(0.4);                              // 宽一些 → 柔和的中心高光带
+          ctx.fill();
+          // 高光点：用球体色掺少量白（不用纯白）→ 与拖尾同色系，立体感减弱
+          const hr2 = cl(cr + (255 - cr) * 0.22), hg2 = cl(cg + (255 - cg) * 0.22), hb2 = cl(cb + (255 - cb) * 0.22);
+          ctx.fillStyle = `rgba(${hr2},${hg2},${hb2},${Math.min(0.42, a * 0.9)})`;
+          ctx.beginPath(); ctx.arc(-s * 0.22, -s * 0.22, s * 0.26, 0, 6.283); ctx.fill();
+          ctx.restore();
+        }
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    } else {
+      for (const p of drawList) {                           // ---- 颗粒：细沙小方粒（原效果） ----
+        ctx.fillStyle = p._st;
+        ctx.fillRect(p._sx - p._sz / 2, p._sy - p._sz / 2, p._sz, p._sz);
+      }
+    }
+
+    // 全部粒子生成并归位后才算成型；成型前禁止切割
+    heartReady = heart.length >= HEART_N && pending === 0;
+
+    // 虚影拖尾：用漂移的解析导数求运动方向，沿反方向画多层渐隐“影子心形”
+    // 多层、越远越淡 → 形成有渐变感、更明显的连续虚影（不扩散成雾）
+    // 球型模式关闭虚影：粒子本身已带彩带拖尾，再叠一层影子心形会显脏、破坏凌冽感
+    if (!scattered && HEART_POSE !== 'spin' && PARTICLE_STYLE !== 'sphere' && !fwBlack) {   // 纯色切黑(夜空)时跳过影子：爱心隐身、无粉红虚影；其它颜色保留
+      const k1 = Math.cos(now * 0.00034) * 0.00034 * 44 + Math.cos(now * 0.0007 + 1.3) * 0.0007 * 27;
+      const k2 = Math.cos(now * 0.0004 + 2.1) * 0.0004 * 35 + Math.cos(now * 0.0008 + 0.4) * 0.0008 * 23;
+      const ml = Math.hypot(k1, k2) || 1;
+      const dirx = k1 / ml, diry = k2 / ml;
+      const TAIL = 8;      // 每层间距（px）：拖尾更短，边缘不再糊
+      const LAYERS = 3;    // 虚影层数：3 层足够有动感，再多就糊了
+      for (let L = 1; L <= LAYERS; L++) {
+        const dist = TAIL * L;
+        const a = 0.11 * Math.pow(0.80, L - 1);   // 越远越淡，形成渐变
+        // 每层用固定淡粉一次性批量绘制，大幅减少绘制调用、提速且渐变干净
+        ctx.fillStyle = `rgba(255,95,150,${a})`;
+        ctx.beginPath();
+        for (let i = 0; i < heart.length; i += 4) {   // 取 1/4 粒子画影子，兼顾密度与性能
+          const p = heart[i];
+          if (!p.locked) continue;   // 只有已归位的才留虚影，飞行中/排队中的不拖影子
+          const x = p.x - dirx * dist, y = p.y - diry * dist, s = p.size * 1.8;
+          ctx.rect(x - s / 2, y - s / 2, s, s);
+        }
+        ctx.fill();
+      }
+    }
+
+    // 沙尘暴（前方层）：爱心之后绘制 → 盖在爱心上，形成绕到前面的 3D 前半壳
+    if (sandActive) drawSandBatch(0, 1e9);
+
+    // 银色星星：烟花绽放点缀（缓缓飘动 + 闪烁 + 淡出），无外圈光晕，样式由 starStyle 决定
+    if (stars.length) {
+      for (let i = stars.length - 1; i >= 0; i--) {
+        const st = stars[i];
+        st.life += dt; st.x += st.vx * dt; st.y += st.vy * dt; st.rot += st.spin * dt;
+        const fade = 1 - st.life / st.maxLife;
+        if (fade <= 0) { stars.splice(i, 1); continue; }
+        const tw = 0.5 + 0.5 * Math.sin(st.life * 0.16 + st.tp);   // 闪烁 0~1：布灵布灵
+        const a = Math.min(1, fade) * tw;
+        const r = st.size * (0.82 + 0.18 * tw);
+        const ss = starStyle;
+        if (ss === 3) {   // 银流星：先在下方画渐隐拖尾（不随自转），再画星核
+          const tl = r * 6 * fade;
+          const g2 = ctx.createLinearGradient(st.x, st.y, st.x, st.y + tl);
+          g2.addColorStop(0, `rgba(236,243,255,${a * 0.85})`);
+          g2.addColorStop(1, 'rgba(236,243,255,0)');
+          ctx.fillStyle = g2;
+          ctx.beginPath(); ctx.moveTo(st.x - r * 0.32, st.y); ctx.lineTo(st.x + r * 0.32, st.y);
+          ctx.lineTo(st.x, st.y + tl); ctx.closePath(); ctx.fill();
+        }
+        ctx.save(); ctx.translate(st.x, st.y); ctx.rotate(st.rot);
+        if (ss === 0 || ss === 1) {                 // 四角尖星（无外圈光晕）
+          const k = r * 0.2;                        // 内凹更收 → 四角更尖、更利落
+          ctx.fillStyle = `rgba(${ss === 1 ? '255,255,255' : '238,244,255'},${a})`;
+          ctx.beginPath();
+          ctx.moveTo(0, -r); ctx.lineTo(k, -k); ctx.lineTo(r, 0); ctx.lineTo(k, k);
+          ctx.lineTo(0, r); ctx.lineTo(-k, k); ctx.lineTo(-r, 0); ctx.lineTo(-k, -k);
+          ctx.closePath(); ctx.fill();
+          if (ss === 1) {                           // 银星(A无晕)：明亮中心核，更「闪耀」
+            ctx.fillStyle = `rgba(255,255,255,${Math.min(1, a * 1.25)})`;
+            ctx.beginPath(); ctx.arc(0, 0, r * 0.32, 0, 6.283); ctx.fill();
+          }
+        } else if (ss === 2) {                      // 银钻切面：菱形主石 + 顶部高光切面
+          ctx.fillStyle = `rgba(228,238,255,${a})`;
+          ctx.beginPath();                          // 整颗菱形
+          ctx.moveTo(0, -r); ctx.lineTo(r * 0.6, 0); ctx.lineTo(0, r); ctx.lineTo(-r * 0.6, 0);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = `rgba(255,255,255,${Math.min(1, a * 1.1)})`;   // 顶部高光
+          ctx.beginPath();
+          ctx.moveTo(0, -r); ctx.lineTo(r * 0.6, 0); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+        } else {                                     // 银流星：四角星核（拖尾已在上方画）
+          const k = r * 0.2;
+          ctx.fillStyle = `rgba(236,243,255,${a})`;
+          ctx.beginPath();
+          ctx.moveTo(0, -r); ctx.lineTo(k, -k); ctx.lineTo(r, 0); ctx.lineTo(k, k);
+          ctx.lineTo(0, r); ctx.lineTo(-k, k); ctx.lineTo(-r, 0); ctx.lineTo(-k, -k);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    ctx.globalCompositeOperation = 'lighter';   // 轻点迸发火星 / 划痕 用叠加发光
+    // 轻点迸发的一簇粒子
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i];
+      p.life += dt; p.vy += 0.055 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      const fade = 1 - p.life / p.maxLife;
+      if (fade <= 0 || p.y > H + 30) { sparks.splice(i, 1); continue; }
+      const a = Math.min(1, fade * 1.4);
+      ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${a * 0.16})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${a})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // 划痕：细亮线（无外晕），长度随划动距离等比例增加，随时间渐隐
+    const SLIFE = 600;    // 划痕寿命(ms)：抬手后 0.6s 内快速渐隐
+    if (stroke && stroke.pts.length >= 2) {
+      const pts = stroke.pts;
+      const a = Math.max(0, 1 - (now - stroke.lastT) / SLIFE);
+      if (a <= 0 && !swiping) { stroke = null; }
+      else {
+        // 笔直划痕：只连「起点 → 当前手指位置」，忽略手指抖动，永远是直线
+        const p0 = pts[0], pn = pts[pts.length - 1];
+        // 位移太短（点击抖动）不画划痕，避免点一下闪出一道痕迹
+        if (Math.hypot(pn.x - p0.x, pn.y - p0.y) >= MIN_CUT) {
+          ctx.globalCompositeOperation = 'source-over'; // 普通绘制，避免叠加累积成白色
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          ctx.strokeStyle = `rgba(255,190,220,${a * 0.42})`;   // 很淡的柔粉，不刺眼
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.lineTo(pn.x, pn.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+    // 烟花层（纯色切黑 → 夜空模式）：透明离屏层合成到最前，不黑屏、不影响爱心
+    if (fwActive) { fwUpdateDraw(); ctx.drawImage(fwCanvas, 0, 0, W, H); }
+    requestAnimationFrame(loop);
+  }
+
+
+  // 左上角切换成型方式：仅记录「待生效」方式，不重生成当前爱心；下一次切割→聚合时自动套用
+  document.querySelectorAll('#panel button[data-m]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingMode = btn.dataset.m;     // 记下待生效方式，当前爱心保持原样
+      document.querySelectorAll('#panel button[data-m]').forEach(b =>
+        b.classList.toggle('on', b.dataset.m === (pendingMode ?? FORMATION)));
+    });
+  });
+  // 心脏跳动开关：点一下切换（默认开启），不影响成型方式
+  document.querySelector('#panel button[data-b="beat"]').addEventListener('click', e => {
+    BEAT = !BEAT;
+    e.currentTarget.classList.toggle('on', BEAT);
+  });
+  // 形状开关：仅记录「待生效」形状，不重生成当前爱心；下一次切割→聚合时自动套用（默认原版/关闭）
+  document.querySelectorAll('#panel button[data-s]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingShape = btn.dataset.s;     // 记下待生效形状
+      // 已成型且未散落 → 立即重抽目标并释放锁定，爱心平滑morph到新形状（不用等切割）
+      // 散落中 / 未成型 → 仅记待生效，下一次「切割→重聚」才套用（与原有行为一致）
+      if (heartReady && !scattered) applyShapeImmediate();
+      const cur = pendingShape !== null ? pendingShape : SHAPE;
+      document.querySelectorAll('#panel button[data-s]').forEach(b =>
+        b.classList.toggle('on', b.dataset.s === cur));
+    });
+  });
+  // 颜色调节器：拖动色盘 → 即时生效（立即重算每颗粒子颜色），所见即所得
+  const colTop = document.getElementById('colTop'), colBot = document.getElementById('colBot');
+  const colSolid = document.getElementById('colSolid'), solidBtn = document.getElementById('solidBtn');
+  const colorbox = document.getElementById('colorbox');
+  function applyColorNow() {
+    colorTouched = true;   // 调色板被拖动/切换 → 均衡饱满钻石色改为跟随顶·底色盘
+    COL_TOP = hex2rgb(colTop.value); COL_BOT = hex2rgb(colBot.value);
+    if (SOLID) COL_SOLID = hex2rgb(colSolid.value);
+    for (const p of heart) { const c = shapeColor(p.hy, p.idx); p.r = c.r; p.g = c.g; p.b = c.b; p.st = null; }
+    const bal = balanceBaseColor();
+    for (const p of sand) p.c = (SHAPE === 'balance') ? { r: bal.r, g: bal.g, b: bal.b } : colorByHeight(p.hy);   // 已在场的沙暴同步变色
+    if (PARTICLE_STYLE === 'sphere') buildSphereSprites();    // 球型贴图随配色重建
+  }
+  colTop.addEventListener('input', applyColorNow);
+  colBot.addEventListener('input', applyColorNow);
+  colSolid.addEventListener('input', () => { if (SOLID) applyColorNow(); });   // 纯色色盘：仅纯色模式下即时生效
+  // 「纯色」开关：点一下整颗心（含沙暴）换成单一颜色，再点一下恢复上下渐变；纯色可用「纯色」色盘调节
+  solidBtn.addEventListener('click', () => {
+    SOLID = !SOLID;
+    solidBtn.classList.toggle('on', SOLID);
+    colorbox.classList.toggle('solid', SOLID);   // 纯色模式只留「纯色」色盘，渐变模式只留顶/底色盘
+    applyColorNow();
+  });
+
+  // 粒子效果（颗粒 / 球型）：即时生效。球型会预渲染发光球贴图（按当前配色分档着色）
+  document.querySelectorAll('#panel button[data-style]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      PARTICLE_STYLE = btn.dataset.style;
+      applySprayTargets();          // 球型：爱心外围散粒子收回边缘；颗粒：还原外飘
+      applyScatterMode();           // 散落中切换：烟花 ⇄ 落地 模式同步（出屏碎片收回屏幕内）
+      if (PARTICLE_STYLE === 'sphere') {
+        buildSphereSprites();       // 飞行粒子贴图随当前配色重建（即变极光色）
+        // 需求1：切到球型即时变色 —— 已成型/散落的稳态粒子颜色立即重抽为球型极光，无需等下次切割
+        for (const p of heart) { const c = shapeColor(p.hy, p.idx); p.r = c.r; p.g = c.g; p.b = c.b; p.st = null; }
+      }
+      document.querySelectorAll('#panel button[data-style]').forEach(b =>
+        b.classList.toggle('on', b.dataset.style === PARTICLE_STYLE));
+    });
+  });
+  // 沙暴形态 / 爱心姿态：运行时自由切换，即时生效（不影响当前爱心；下次切割→聚合也沿用）
+  document.querySelectorAll('#panel button[data-sand]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      SAND_DEPTH = btn.dataset.sand;
+      document.querySelectorAll('#panel button[data-sand]').forEach(b =>
+        b.classList.toggle('on', b.dataset.sand === SAND_DEPTH));
+    });
+  });
+  document.querySelectorAll('#panel button[data-pose]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.pose;
+      if (target === 'spin') {
+        // 切到自转：立即生效（同时取消任何待生效的切换）
+        pendingPose = null;
+        pendingFront = 0;
+        HEART_POSE = 'spin';
+        spinAngle = 0;
+        for (const p of heart) p.st = null;
+      } else if (HEART_POSE === 'spin') {
+        // 正在自转时切到「正面/摆动」：记录待生效目标，并锁定「下一个正面角」，等转回正面再切换
+        pendingPose = target;
+        // 爱心左右对称（heartX=16sin³t 为奇函数）→ |cosA|=1 时都是满宽正面，
+        // 故「正面」每半圈(π)出现一次，不必等整整一圈(2π)：等待时间最长半圈。
+        // 若点击瞬间本来就正对观众（|cosA|≈1），则无需再等，下一帧直接切。
+        pendingFront = (Math.abs(Math.cos(spinAngle)) >= 0.98)
+          ? spinAngle                                              // 已在正面 → 立即切
+          : Math.ceil(spinAngle / Math.PI) * Math.PI;              // 否则等到下一个「正面」位（每半圈一次）
+      } else {
+        // 非自转态：直接切换
+        HEART_POSE = target;
+        spinAngle = 0;
+        for (const p of heart) p.st = null;
+      }
+      // 高亮：待生效时高亮目标姿态，让用户看到已选中（爱心转回正面后才真正切换）
+      document.querySelectorAll('#panel button[data-pose]').forEach(b =>
+        b.classList.toggle('on', b.dataset.pose === (pendingPose ?? HEART_POSE)));
+    });
+  });
+
+  // 微星效果：切换切割时银色星星的样式；「关闭」则完全禁用微星
+  document.querySelectorAll('#panel button[data-star]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.star;
+      if (v === 'off') {
+        starEnabled = false;
+        stars.length = 0;                  // 立即清空已显示的微星
+      } else {
+        starEnabled = true;
+        starStyle = +v;
+      }
+      document.querySelectorAll('#panel button[data-star]').forEach(b =>
+        b.classList.toggle('on', b.dataset.star === v));
+    });
+  });
+
+
+  // 下拉菜单（形成方式 / 重聚背景 / 动作 / 微星效果）：点击展开，点子项或空白处收起
+  document.querySelectorAll('#panel .dropdown').forEach(dd => {
+    const dropbtn = dd.querySelector('.dropbtn');
+    dropbtn.addEventListener('click', e => {
+      e.stopPropagation();                              // 不冒泡到 document，避免被立即关闭
+      const willOpen = !dd.classList.contains('open');
+      document.querySelectorAll('#panel .dropdown.open').forEach(o => o.classList.remove('open'));
+      if (willOpen) dd.classList.add('open');
+    });
+    dd.querySelectorAll('.menu button').forEach(b =>    // 选中子项后收起本下拉
+      b.addEventListener('click', () => dd.classList.remove('open')));
+  });
+  document.addEventListener('click', () => {            // 点击空白处收起所有下拉
+    document.querySelectorAll('#panel .dropdown.open').forEach(o => o.classList.remove('open'));
+  });
+
+  /* ---------- 手势：握拳 → 张开五指 → 触发散开（效果同切割） ---------- */
+  // 后台静默识别：不显示摄像头画面，仅借摄像头做手部姿态识别。
+  // 与参考文件不同：参考「识别到张开即持续绽放」；本功能需「先握拳、再张开」的过渡才触发一次散开。
+  let handEnabled = false;          // 手势开关（面板按钮控制）
+  let handReady = false;            // MediaPipe + 摄像头是否就绪
+  let fistSeen = false;             // 本轮是否已出现过握拳（握拳 → 张开 = 散开）
+  let openSeen = false;             // 本轮是否已出现过张开（张开 → 握拳 = 重聚）
+  let handGone = 0;                 // 连续无手帧计数：短暂跟踪丢失不重置哨兵（快速换手势时防误清）
+  let peaceHold = 0;                // 比耶连续保持帧数：需保持约 5 帧才触发（过滤握拳→张开过渡态）
+  let handVideo = null, handStream = null, hands = null;
+  const gestureBtn = document.getElementById('gestureBtn');
+  gestureBtn.title = '握拳 → 张开：散开　|　张开 → 握拳：重聚　|　比耶 ✌：一阵流星雨';
+
+  // ===== 比耶 ✌ 触发流星雨（离屏透明层 · 一阵即止 · 含银色闪星）=====
+  const METEOR_STYLES = {
+    minimal: { density:.34, max:16, speed:[21,34], len:[160,360], width:[.8,1.4], angMin:.45, angMax:1.05, glow:0,   head:false, cols:[[255,255,255],[218,230,255]] },
+    warm:    { density:.40, max:12, speed:[15,27], len:[170,420], width:[1,2.4],  angMin:.40, angMax:1.00, glow:.9,  head:true, headScale:1.1, cols:[[255,210,170],[255,180,200],[255,230,190]] }
+  };
+  let meteorActive = false, meteorTimer = 0, meteorCool = 0, meteorStyle = 'minimal';
+  const meteors = [], flares = [];
+  function meteorTrigger(style) { meteorStyle = style; meteorActive = true; meteorTimer = 150; }   // 约 2.5s 生成期
+  function meteorSpawn() {
+    const s = METEOR_STYLES[meteorStyle];
+    let x, y;
+    if (Math.random() < 0.55) { x = Math.random() * W * 1.1 - W * 0.05; y = -Math.random() * H * 0.5 - 20; }
+    else { x = -Math.random() * W * 0.3 - 20; y = Math.random() * H * 1.1 - H * 0.05; }
+    const ang = s.angMin + Math.random() * (s.angMax - s.angMin);          // 斜向右下（每颗抖动，不严格一致）
+    const sp = s.speed[0] + Math.random() * (s.speed[1] - s.speed[0]);
+    const c = s.cols[(Math.random() * s.cols.length) | 0];
+    meteors.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+      len: s.len[0] + Math.random() * (s.len[1] - s.len[0]), w: s.width[0] + Math.random() * (s.width[1] - s.width[0]),
+      life: 0, maxLife: 55 + Math.random() * 65, r: c[0], g: c[1], b: c[2] });
+  }
+  // 亮银色闪星：实心核心(实) + 暗淡银蓝小光晕，整体偏小
+  function drawStar(x, y, r, a) {
+    const R = r * 3; const g = mctx.createRadialGradient(x, y, 0, x, y, R);
+    g.addColorStop(0, `rgba(238,244,255,${a})`);
+    g.addColorStop(0.30, `rgba(205,220,248,${a * 0.28})`);
+    g.addColorStop(1, `rgba(205,220,248,0)`);
+    mctx.fillStyle = g; mctx.beginPath(); mctx.arc(x, y, R, 0, 6.283); mctx.fill();
+    mctx.fillStyle = `rgba(244,248,255,${a})`;
+    mctx.beginPath(); mctx.arc(x, y, r * 0.72, 0, 6.283); mctx.fill();
+  }
+  function meteorUpdateDraw() {
+    const s = METEOR_STYLES[meteorStyle];
+    mctx.clearRect(0, 0, W, H);
+    // 生成（仅阵雨期内）
+    if (meteorTimer > 0 && meteors.length < s.max && Math.random() < s.density) meteorSpawn();
+    if (meteorTimer > 0 && Math.random() < 0.16) flares.push({ x: Math.random() * W, y: Math.random() * H, life: 0, maxLife: 24 + Math.random() * 30, r: 0.4 + Math.random() * 0.45 });
+    // 流星
+    mctx.globalCompositeOperation = s.glow > 0 ? 'lighter' : 'source-over';
+    for (let i = meteors.length - 1; i >= 0; i--) {
+      const m = meteors[i]; m.x += m.vx; m.y += m.vy; m.life++;
+      if (m.y > H + 80 || m.x > W + 80 || m.life > m.maxLife) { meteors.splice(i, 1); continue; }
+      const d = Math.hypot(m.vx, m.vy) || 1;
+      const tx = m.x - m.vx / d * m.len, ty = m.y - m.vy / d * m.len;
+      const fade = Math.max(0, 1 - m.life / m.maxLife) * 0.95;
+      if (s.glow > 0) {
+        const grd = mctx.createLinearGradient(m.x, m.y, tx, ty);
+        grd.addColorStop(0, `rgba(${m.r},${m.g},${m.b},${fade})`);
+        grd.addColorStop(1, `rgba(${m.r},${m.g},${m.b},0)`);
+        mctx.strokeStyle = grd; mctx.lineWidth = m.w * (s.glow > 1 ? 1.4 : 1); mctx.lineCap = 'round';
+        mctx.beginPath(); mctx.moveTo(m.x, m.y); mctx.lineTo(tx, ty); mctx.stroke();
+        if (s.head) { mctx.fillStyle = `rgba(255,255,255,${fade})`; mctx.beginPath(); mctx.arc(m.x, m.y, m.w * (s.headScale || 1.6), 0, 6.283); mctx.fill(); }
+      } else {
+        mctx.strokeStyle = `rgba(${m.r},${m.g},${m.b},${fade})`; mctx.lineWidth = m.w; mctx.lineCap = 'round';
+        mctx.beginPath(); mctx.moveTo(m.x, m.y); mctx.lineTo(tx, ty); mctx.stroke();
+      }
+    }
+    // 闪星
+    mctx.globalCompositeOperation = 'lighter';
+    for (let i = flares.length - 1; i >= 0; i--) {
+      const f = flares[i]; f.life++;
+      if (f.life > f.maxLife) { flares.splice(i, 1); continue; }
+      drawStar(f.x, f.y, f.r, Math.sin(f.life / f.maxLife * Math.PI) * 0.95);
+    }
+    mctx.globalCompositeOperation = 'source-over';
+  }
+  // 三种手势 = 数「伸直手指个数」，伸直数互不重叠：握拳=0、比耶=2、张开=4。
+  // 统一阈值：伸直 = 指尖到腕距 > 中节到腕距 × 1.05（原 1.08，降阈值更灵敏）。
+  // 比耶（✌ V 手势）：食指 + 中指伸直，无名指 + 小指弯曲。
+  // 注意：握拳→张开的过程会短暂经过「两指伸直」态，故比耶需连续保持数帧（peaceHold）才触发，
+  //       一晃而过的过渡态不会满足保持帧数，不会误触流星雨。
+  function checkPeace(lm) {
+    const w = lm[0];
+    const dW = n => Math.hypot(lm[n].x - w.x, lm[n].y - w.y);
+    const ext = n => dW(n) > dW(n - 2) * 1.05;                     // 四指伸直判定（n=8/12/16/20 → 中节 6/10/14/18）
+    return ext(8) && ext(12) && !ext(16) && !ext(20);
+  }
+
+  // 张开 =「五指伸直」：四指 + 拇指全伸直。
+  function checkOpenHand(lm) {
+    const w = lm[0];
+    const dW = n => Math.hypot(lm[n].x - w.x, lm[n].y - w.y);
+    const ext = n => dW(n) > dW(n - 2) * 1.05;
+    const thumbUp = dW(4) > dW(3) * 1.05;
+    return ext(8) && ext(12) && ext(16) && ext(20) && thumbUp;
+  }
+
+  // 握拳 =「四指弯曲」：食指必弯，中/无名/小指最多一根伸直（容一根略松，如小指）。
+  function checkFist(lm) {
+    const w = lm[0];
+    const dW = n => Math.hypot(lm[n].x - w.x, lm[n].y - w.y);
+    const ext = n => dW(n) > dW(n - 2) * 1.05;
+    const othersExt = (ext(12) ? 1 : 0) + (ext(16) ? 1 : 0) + (ext(20) ? 1 : 0);
+    return !ext(8) && othersExt <= 1;
+  }
+  function onHandResults(res) {
+    if (!res.multiHandLandmarks || res.multiHandLandmarks.length === 0) {
+      // 连续约 1/3 秒无手才重置哨兵：快速换手势时 MediaPipe 常有一两帧跟踪丢失，
+      // 若立即清空会把「握拳→张开」中途的哨兵抹掉，导致散开/重聚失灵。
+      if (++handGone > 20) { fistSeen = false; openSeen = false; }
+      return;
+    }
+    handGone = 0;
+    if (fwActive) return;   // 烟花释放期间禁用所有手势（比耶/握拳/张开均不响应）
+    const lm = res.multiHandLandmarks[0];
+    // 比耶 ✌ 优先：需连续保持约 5 帧才触发（握拳→张开过渡态一晃而过、凑不满帧数），防连发靠 meteorCool
+    if (checkPeace(lm)) {
+      peaceHold++;
+      if (peaceHold >= 5 && meteorCool <= 0) {
+        meteorTrigger(Math.random() < 0.5 ? 'minimal' : 'warm');
+        meteorCool = 60;
+        peaceHold = 0;   // 触发后归零：必须「松开再比耶」才会再放一阵，长按不连发
+      }
+    // 握拳→张开=散开，张开→握拳=重聚。每次到位都「消费上一个哨兵 + 置位自己的哨兵」，持续同一姿势不重复触发。
+    } else if (checkFist(lm)) {
+      peaceHold = 0;
+      // 张开 → 握拳：复原。需碎片已落定（与点击复原同一条件），未落定时握拳先不生效
+      if (openSeen && scattered && allSettled()) { reform(); handCool = 10; }   // 重聚：仅让路 0.17s，比耶几乎立刻可用；散开的 45 帧保留防卡顿
+      openSeen = false; fistSeen = true;
+    } else if (checkOpenHand(lm)) {
+      peaceHold = 0;
+      // 握拳 → 张开：散开（效果同切割，全局触发，不要求划过爱心）
+      if (fistSeen && heartReady && !scattered) { scatter(0, 0); handCool = 45; }  // 爆炸：识别让路约 0.75s
+      fistSeen = false; openSeen = true;
+    } else {
+      peaceHold = 0;
+    }
+  }
+  // 识别循环：先排下一帧（保证 send 挂起也不会卡死循环），再用「忙标志」串行化。
+  //   必须串行：MediaPipe 处理一张要几十 ms，若每帧都塞（手机 90/120Hz），队列会迅速堆积 →
+  //   WASM 堆越界（memory access out of bounds）、识别停摆。
+  //   旧版用 await 天然串行所以没事；改非阻塞后必须补回这个「一次只送一张」的约束。
+  let handBusy = false;
+  let handCool = 0;                                      // 识别冷却帧数：手势触发爆炸后短暂让路，算力全给爆炸动画
+  let lastHandSend = 0;                                  // 识别节流时间戳：控制送帧频率，给粒子渲染让出算力
+  function handSendLoop() {
+    if (!handEnabled || !hands || !handVideo) return;
+    requestAnimationFrame(handSendLoop);                 // 先排下一帧
+    if (handCool > 0) { handCool--; return; }            // 冷却期内不发图（爆炸瞬间让路，手感无影响：动作已完成）
+    if (handBusy) return;                                // 上一张还没处理完 → 本帧跳过（关键：防堆积）
+    // 节流：每 ~45ms（≈22fps）才送一帧给 MediaPipe。手势是慢变化姿态，无需 60fps 识别；
+    //   全速 send 会把 WASM 识别算力占满，挤掉粒子渲染帧 → 肉眼可见卡顿。降频后渲染恢复流畅，
+    //   手势响应延迟仅增几十 ms（人眼无感）。不影响灵敏度阈值。
+    if (performance.now() - lastHandSend < 45) return;
+    lastHandSend = performance.now();
+    if (handVideo.readyState >= 2) {
+      handBusy = true;
+      hands.send({ image: handVideo }).then(() => {
+        handBusy = false;                                // 成功 → 解锁
+      }, e => {
+        // WASM 堆越界属不可恢复错误：停掉识别并复位按钮，避免「看着是开启、实则已死」的欺骗状态
+        if (/memory access out of bounds|out of memory/i.test(String(e && e.message || e))) {
+          handEnabled = false; handReady = false;
+          gestureBtn.classList.remove('on');
+          gestureBtn.textContent = '手势（异常，可重开）';
+        }
+        handBusy = false;                                // 失败 → 也解锁（不用 .finally，兼容老浏览器）
+      });
+    }
+  }
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.crossOrigin = 'anonymous';
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('加载失败: ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  // 给可能挂起的异步操作加超时，避免按钮永远卡在「开启中」
+  function withTimeout(p, ms, msg) {
+    return new Promise((resolve, reject) => {
+      const id = setTimeout(() => reject(new Error(msg || '超时')), ms);
+      p.then(v => { clearTimeout(id); resolve(v); }, e => { clearTimeout(id); reject(e); });
+    });
+  }
+  async function enableGesture() {
+    handEnabled = true;
+    gestureBtn.classList.add('on');
+    try {
+      if (typeof Hands === 'undefined') {
+        // 优先 APK 本地托管的模型（离线可用）；失败再回退 CDN（联网时）
+        try {
+          await withTimeout(loadScript('http://127.0.0.1:8080/mediapipe/hands.js'), 6000, '本地模型加载超时');
+        } catch (_) {
+          await withTimeout(loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js'), 10000, '手势模型加载超时');
+        }
+      }
+      handVideo = document.createElement('video');
+      handVideo.setAttribute('playsinline', ''); handVideo.muted = true;
+      handVideo.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;';
+      document.body.appendChild(handVideo);
+      // 分辨率上限 640×480：手机默认可能给 1080p，帧数据过大会撑爆 MediaPipe 的 WASM 堆
+      //   （报错 memory access out of bounds）。识别本身也不需要高分辨率。
+      handStream = await withTimeout(navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 480, max: 640 }, height: { ideal: 360, max: 480 } },
+        audio: false
+      }), 8000, '摄像头请求超时');
+      handVideo.srcObject = handStream;
+      await handVideo.play();
+      hands = new Hands({ locateFile: f => `http://127.0.0.1:8080/mediapipe/${f}` });
+      hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+      hands.onResults(onHandResults);
+      handReady = true;
+      handSendLoop();
+    } catch (e) {
+      handEnabled = false; handReady = false; handBusy = false; handCool = 0;   // 摄像头/权限失败：保留原有划屏切割作兜底
+      gestureBtn.classList.remove('on');
+      const msg = String(e && e.message || e);
+      gestureBtn.textContent = '手势（失败：' + msg.slice(0, 18) + '）';
+      if (handStream) { handStream.getTracks().forEach(t => t.stop()); handStream = null; }
+      if (handVideo) { handVideo.remove(); handVideo = null; }
+    }
+  }
+  function disableGesture() {
+    handEnabled = false; handReady = false; fistSeen = false; openSeen = false; handGone = 0; peaceHold = 0; handBusy = false; handCool = 0;
+    if (hands && hands.close) { try { hands.close(); } catch (_) {} }
+    hands = null;
+    if (handStream) { handStream.getTracks().forEach(t => t.stop()); handStream = null; }
+    if (handVideo) { handVideo.remove(); handVideo = null; }
+    gestureBtn.classList.remove('on');
+    gestureBtn.textContent = '手势';
+  }
+  gestureBtn.addEventListener('click', () => { handEnabled ? disableGesture() : enableGesture(); });
+
+  // ========== 烟花系统：纯色切黑 → 夜空模式自动绽放 ==========
+  const fwCanvas = document.createElement('canvas');
+  const fctx = fwCanvas.getContext('2d');
+  function fwResize(){ fwCanvas.width = W; fwCanvas.height = H; }
+  fwResize();
+  window.addEventListener('resize', fwResize);
+
+  // 基础款：basic 普通 / chrys 菊 / real 真实彗星（移植自参考页，去 bg/trail，用透明层承担）
+  const FW = {
+    willow:   { group:'basic', count:90,  speedMin:1.4, speedMax:3.8, gravity:0.075, drag:0.985, trailLen:16, lifeMin:100, lifeMax:165, sizeMin:0.9, sizeMax:1.6, colors:[[255,200,90],[255,170,60],[255,222,140]], multi:false },
+    gold:     { group:'basic', count:100, speedMin:2,   speedMax:6.5, gravity:0.04,  drag:0.97,  trailLen:12, lifeMin:55,  lifeMax:95,  sizeMin:0.8, sizeMax:1.5, colors:[[255,225,150],[255,200,110]], multi:false },
+    minimal:  { group:'basic', count:60,  speedMin:2.5, speedMax:5,   gravity:0.03,  drag:0.95,  trailLen:12, lifeMin:50,  lifeMax:90,  sizeMin:0.6, sizeMax:1.2, colors:[[255,255,255],[210,225,255]], multi:false },
+    warm:     { group:'basic', count:90,  speedMin:2,   speedMax:6,   gravity:0.04,  drag:0.97,  trailLen:12, lifeMin:55,  lifeMax:95,  sizeMin:0.8, sizeMax:1.5, colors:[[255,150,170],[255,200,150],[255,180,200]], multi:false },
+    cool:     { group:'basic', count:90,  speedMin:2,   speedMax:6,   gravity:0.04,  drag:0.97,  trailLen:12, lifeMin:55,  lifeMax:95,  sizeMin:0.7, sizeMax:1.4, colors:[[90,180,255],[120,220,255],[150,255,200]], multi:false },
+    redgold:  { group:'basic', count:110, speedMin:2,   speedMax:6.5, gravity:0.04,  drag:0.97,  trailLen:12, lifeMin:55,  lifeMax:95,  sizeMin:0.8, sizeMax:1.6, colors:[[255,70,70],[255,200,110]], multi:true },
+    violet:   { group:'basic', count:90,  speedMin:2,   speedMax:6,   gravity:0.04,  drag:0.97,  trailLen:12, lifeMin:55,  lifeMax:95,  sizeMin:0.7, sizeMax:1.4, colors:[[180,120,255],[150,90,255],[200,160,255]], multi:false },
+    longline: { group:'basic', count:70,  speedMin:2.5, speedMax:5.5, gravity:0.028, drag:0.96,  trailLen:18, lifeMin:70,  lifeMax:120, sizeMin:0.5, sizeMax:1.1, colors:[[255,255,255]], multi:false },
+    chrysGold:   { group:'chrys', count:150, layers:[[6.5,8.5],[4,5.5],[2.2,3.2]], gravity:0.04, drag:0.965, trailLen:12, lifeMin:58, lifeMax:105, sizeMin:0.5, sizeMax:1.1, colors:[[255,200,110],[255,225,150]], multi:false, secondary:true, splitChance:0.14 },
+    chrysSilver: { group:'chrys', count:150, layers:[[6.5,8.5],[4,5.5],[2.2,3.2]], gravity:0.04, drag:0.965, trailLen:12, lifeMin:58, lifeMax:105, sizeMin:0.5, sizeMax:1.1, colors:[[255,255,255],[210,225,255]], multi:false, secondary:true, splitChance:0.14 },
+    realGold:   { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.03,  drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.6, sizeMax:3.0, colors:[[255,200,110],[255,225,150],[255,180,80]], comet:true },
+    realSilver: { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.028, drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.5, sizeMax:2.7, colors:[[255,255,255],[210,225,255]], comet:true },
+    realRed:    { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.03,  drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.6, sizeMax:2.9, colors:[[255,70,70],[255,120,90]], comet:true },
+    realBlue:   { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.028, drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.5, sizeMax:2.7, colors:[[90,180,255],[120,220,255]], comet:true }
+  };
+
+  const fwRockets = [], fwParts = [];
+  const FW_MAX = 3200;
+  const fwRnd = (a,b)=> a + Math.random()*(b-a);
+  const fwPick = a => a[(Math.random()*a.length)|0];
+
+  // 三类概率（普通最常用 / 真实次之 / 菊稀少）+ 各类内部组合数量概率
+  function pickCombo(){
+    const r = Math.random();
+    let pool, nMax, singleP, doubleP;
+    if(r < 0.55){ pool=['willow','gold','minimal','warm','cool','redgold','violet','longline']; singleP=0.45; doubleP=0.40; nMax=3; }
+    else if(r < 0.75){ pool=['chrysGold','chrysSilver']; singleP=0.40; doubleP=0.60; nMax=2; }  // 菊：双色(金+银)比例高，像红金国风
+    else { pool=['realGold','realSilver','realRed','realBlue']; singleP=0.40; doubleP=0.40; nMax=3; }
+    const rr = Math.random();
+    let n = 1;
+    if(nMax>=3 && rr>singleP+doubleP) n = 3;
+    else if(rr>singleP) n = 2;
+    const combo = [], tmp = pool.slice();   // 随机 n 个不重复基础款叠加（共享爆炸中心 → 多色组合）
+    while(combo.length<n && tmp.length) combo.push(tmp.splice((Math.random()*tmp.length)|0,1)[0]);
+    return combo;
+  }
+
+  function fwLaunch(combo){
+    const first = FW[combo[0]];
+    const sx = fwRnd(W*0.15, W*0.85);
+    const ty = fwRnd(H*0.12, H*0.45);
+    fwRockets.push({ x:sx, y:H+8, vx:fwRnd(-1,1), vy:-fwRnd(9,12.5), ty, color:fwPick(first.colors), hist:[], combo });
+  }
+
+  function fwExplode(x, y, combo){
+    for(const key of combo){
+      const s = FW[key];
+      const baseColor = fwPick(s.colors);
+      const n = s.count;
+      for(let i=0;i<n;i++){
+        let ang, sp;
+        if(s.ring){ ang=(i/n)*Math.PI*2; sp=(s.speedMin+s.speedMax)/2; }
+        else if(s.layers){ const L=fwPick(s.layers); ang=fwRnd(0,Math.PI*2); sp=fwRnd(L[0],L[1]); }
+        else { ang=fwRnd(0,Math.PI*2); sp=fwRnd(s.speedMin,s.speedMax); }
+        const color = s.multi ? fwPick(s.colors) : baseColor;
+        const life = fwRnd(s.lifeMin, s.lifeMax);
+        const canSplit = !!(s.secondary && Math.random() < (s.splitChance||0.14));
+        fwParts.push({ x, y, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp, life, maxLife:life, color, size:fwRnd(s.sizeMin,s.sizeMax), flick:Math.random()<0.30, split:canSplit, splitLife:canSplit?life*fwRnd(0.42,0.58):0, didSplit:false, hist:[], comet:!!s.comet, trailLen:s.trailLen||12, gravity:s.gravity, drag:s.drag });
+      }
+    }
+  }
+
+  function fwDrawTrail(hist, c, width, alpha){
+    const col = `rgb(${c[0]},${c[1]},${c[2]})`;
+    const n = hist.length;
+    fctx.globalAlpha = alpha;
+    fctx.strokeStyle = col; fctx.fillStyle = col;
+    fctx.lineCap='round'; fctx.lineJoin='round';
+    if(n<2){ if(n===1){ if(hist[0].comet) fwDrawHead(hist[0],width,c,alpha); else { fctx.beginPath(); fctx.arc(hist[0].x,hist[0].y,width,0,7); fctx.fill(); } } return; }
+    if(hist[0].comet){
+      for(let k=0;k<n-1;k++){ const t=1-k/(n-1); fctx.lineWidth=Math.max(0.6, width*(0.12+1.0*t)); fctx.beginPath(); fctx.moveTo(hist[k].x,hist[k].y); fctx.lineTo(hist[k+1].x,hist[k+1].y); fctx.stroke(); }
+      fwDrawHead(hist[0],width,c,alpha);
+    } else { fctx.lineWidth=width; fctx.beginPath(); fctx.moveTo(hist[0].x,hist[0].y); for(let k=1;k<n;k++) fctx.lineTo(hist[k].x,hist[k].y); fctx.stroke(); }
+  }
+  function fwDrawHead(h, w, c, a){ fctx.globalAlpha=a; fctx.fillStyle=`rgb(${c[0]},${c[1]},${c[2]})`; fctx.beginPath(); fctx.ellipse(h.x,h.y,w*1.3,w*0.9,0,0,7); fctx.fill(); }
+
+  let fwActive = false;
+  function fwUpdateDraw(){
+    fctx.clearRect(0,0,W,H);
+    fctx.globalCompositeOperation='lighter';
+    for(let i=fwRockets.length-1;i>=0;i--){
+      const r=fwRockets[i]; r.vy+=0.14; r.x+=r.vx; r.y+=r.vy;
+      r.hist.unshift({x:r.x,y:r.y,comet:false}); if(r.hist.length>6) r.hist.pop();
+      fwDrawTrail(r.hist, r.color, 1.6, 1);
+      if(r.vy>=-1.2 || r.y<=r.ty){ fwExplode(r.x,r.y,r.combo); fwRockets.splice(i,1); }
+    }
+    for(let i=fwParts.length-1;i>=0;i--){
+      const p=fwParts[i];
+      p.vx*=p.drag; p.vy*=p.drag; p.vy+=p.gravity; p.x+=p.vx; p.y+=p.vy;
+      if(p.split && !p.didSplit && p.life<=p.splitLife){
+        const fn=5+(Math.random()*4|0);
+        for(let j=0;j<fn;j++){ const a2=fwRnd(0,Math.PI*2), s2=fwRnd(1,2.6), l2=fwRnd(24,44); fwParts.push({x:p.x,y:p.y,vx:Math.cos(a2)*s2,vy:Math.sin(a2)*s2,life:l2,maxLife:l2,color:p.color,size:fwRnd(0.4,0.9),flick:true,split:false,didSplit:false,hist:[],comet:p.comet,trailLen:p.trailLen,gravity:0.05,drag:0.95}); }
+        p.didSplit=true; fwParts.splice(i,1); continue;
+      }
+      p.life--; if(p.life<=0){ fwParts.splice(i,1); continue; }
+      p.hist.unshift({x:p.x,y:p.y,comet:p.comet}); if(p.hist.length>p.trailLen) p.hist.pop();
+      let a=p.life/p.maxLife; if(p.flick && a<0.6) a*=(0.35+Math.random()*0.65);
+      fwDrawTrail(p.hist, p.color, p.size, a);
+    }
+    if(fwParts.length>FW_MAX) fwParts.splice(0, fwParts.length-FW_MAX);
+    fctx.globalCompositeOperation='source-over'; fctx.globalAlpha=1;
+  }
+
+  function fwAutoFire(){
+    if(!fwActive) return;
+    const burst = 1 + (Math.random()<0.4?1:0);   // 偶发双发
+    for(let k=0;k<burst;k++) fwLaunch(pickCombo());
+    setTimeout(fwAutoFire, fwRnd(650,1300));      // 稀疏：时不时来几朵
+  }
+
+  let fwEndTimer = null, fwAutoReform = false;
+
+  // 颜色复位为初始（白顶粉底渐变）：关掉纯色、清 colorTouched，所有在场粒子/球型贴图同步
+  function resetInitialColor(){
+    if (SOLID) { SOLID = false; solidBtn.classList.remove('on'); colorbox.classList.remove('solid'); }
+    colorTouched = false;
+    for (const p of heart) { const c = shapeColor(p.hy, p.idx); p.r = c.r; p.g = c.g; p.b = c.b; p.st = null; }
+    if (PARTICLE_STYLE === 'sphere') buildSphereSprites();
+  }
+
+  // 夜空结束：停发烟花 → 颜色复位为初始 → 自动切割 → 置位「落定后自动重聚」
+  function endNight(){
+    if (!fwActive) return;
+    fwActive = false;
+    if (fwEndTimer) { clearTimeout(fwEndTimer); fwEndTimer = null; }
+    fwRockets.length = 0; fwParts.length = 0;          // 清场，干净交接到爱心切割
+    resetInitialColor();
+    if (!scattered && heartReady) { scatter(0, 0); fwAutoReform = true; }   // 自动切割，随后自动重聚
+  }
+
+  // 颜色切黑 → 夜空模式：SOLID（纯色模式）且纯色接近黑时开启，否则关闭
+  function fwCheckNight(){
+    const on = SOLID && Math.max(COL_SOLID.r, COL_SOLID.g, COL_SOLID.b) < 28;
+    if (on && !fwActive) {
+      fwActive = true;
+      fwAutoFire();
+      fwEndTimer = setTimeout(endNight, 12000);        // 约 12 秒后自动结束 → 切割+复位+重聚
+    } else if (!on && fwActive) {
+      endNight();                                      // 手动切回非黑：同样走结束流程
+    }
+  }
+  colSolid.addEventListener('input', fwCheckNight);
+  solidBtn.addEventListener('click', ()=> setTimeout(fwCheckNight, 0));   // 纯色开关翻转后再判定
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
