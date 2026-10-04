@@ -1026,7 +1026,7 @@
     swiping = false;
     // 位移未达切割距离 → 一律算轻点（点击抖动也有反馈，绝不误切）
     if (Math.hypot(e.clientX - downX, e.clientY - downY) < MIN_CUT) {
-      if (fwActive) { endNight(); return; }   // 烟花释放期间点击 → 立即结束烟花，随后自动切割+重聚
+      if (fwActive) { return; }   // 烟花表演（含终场巨大金银菊）期间点击忽略：确保完整放完巨大金银菊后才可切割
       if (!heartReady) return;                                    // 爱心未成型：轻点不迸发粒子
       // 已散落 → 必须等全部颗粒落定（躺在屏幕底下 / 烟花飞出屏幕）才允许复原；
       // 未落定时点击只迸发一小簇火星做「已收到点击」的反馈，不打断坠落过程
@@ -1750,8 +1750,8 @@
 
   // ===== 比耶 ✌ 触发流星雨（离屏透明层 · 一阵即止 · 含银色闪星）=====
   const METEOR_STYLES = {
-    minimal: { density:.34, max:16, speed:[21,34], len:[160,360], width:[.8,1.4], angMin:.45, angMax:1.05, glow:0,   head:false, cols:[[255,255,255],[218,230,255]] },
-    warm:    { density:.40, max:12, speed:[15,27], len:[170,420], width:[1,2.4],  angMin:.40, angMax:1.00, glow:.9,  head:true, headScale:1.1, cols:[[255,210,170],[255,180,200],[255,230,190]] }
+    minimal: { density:.52, max:26, speed:[21,34], len:[160,360], width:[.8,1.4], angMin:.45, angMax:1.05, glow:0,   head:false, cols:[[255,255,255],[218,230,255]] },
+    warm:    { density:.58, max:20, speed:[15,27], len:[170,420], width:[1,2.4],  angMin:.40, angMax:1.00, glow:.9,  head:true, headScale:1.1, cols:[[255,210,170],[255,180,200],[255,230,190]] }
   };
   let meteorActive = false, meteorTimer = 0, meteorCool = 0, meteorStyle = 'minimal';
   const meteors = [], flares = [];
@@ -1826,13 +1826,15 @@
   }
 
   // 张开 =「五指伸直」：四指 + 拇指全伸直。
+  //   无名/小指用标准 1.05（与食/中一致）：从握拳张开时这两指本就伸不太直，过严(1.15)会导致
+  //   「握拳→张开」始终读不到全开、永不触发散开。比耶的松弛手指靠下方 openHold 连续5帧守卫拦截，
+  //   无需在此额外加严（比耶的16/20明显弯曲，本就通不过 ext）。
   function checkOpenHand(lm) {
     const w = lm[0];
     const dW = n => Math.hypot(lm[n].x - w.x, lm[n].y - w.y);
     const ext = n => dW(n) > dW(n - 2) * 1.05;
-    const open = n => dW(n) > dW(n - 2) * 1.15;          // 无名指/小指更严阈值：比耶的松弛手指不会被算成全开
     const thumbUp = dW(4) > dW(3) * 1.05;
-    return ext(8) && ext(12) && open(16) && open(20) && thumbUp;
+    return ext(8) && ext(12) && ext(16) && ext(20) && thumbUp;
   }
 
   // 握拳 =「四指弯曲」：食指必弯，中/无名/小指最多一根伸直（容一根略松，如小指）。
@@ -1998,10 +2000,13 @@
     longline: { group:'basic', count:70,  speedMin:2.5, speedMax:5.5, gravity:0.028, drag:0.96,  trailLen:18, lifeMin:70,  lifeMax:120, sizeMin:0.5, sizeMax:1.1, colors:[[255,255,255]], multi:false },
     chrysGold:   { group:'chrys', count:150, layers:[[6.5,8.5],[4,5.5],[2.2,3.2]], gravity:0.04, drag:0.965, trailLen:12, lifeMin:58, lifeMax:105, sizeMin:0.5, sizeMax:1.1, colors:[[255,200,110],[255,225,150]], multi:false, secondary:true, splitChance:0.14 },
     chrysSilver: { group:'chrys', count:150, layers:[[6.5,8.5],[4,5.5],[2.2,3.2]], gravity:0.04, drag:0.965, trailLen:12, lifeMin:58, lifeMax:105, sizeMin:0.5, sizeMax:1.1, colors:[[255,255,255],[210,225,255]], multi:false, secondary:true, splitChance:0.14 },
-    realGold:   { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.03,  drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.6, sizeMax:3.0, colors:[[255,200,110],[255,225,150],[255,180,80]], comet:true },
-    realSilver: { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.028, drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.5, sizeMax:2.7, colors:[[255,255,255],[210,225,255]], comet:true },
-    realRed:    { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.03,  drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.6, sizeMax:2.9, colors:[[255,70,70],[255,120,90]], comet:true },
-    realBlue:   { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.028, drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.5, sizeMax:2.7, colors:[[90,180,255],[120,220,255]], comet:true }
+    realGold:   { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.03,  drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.0, sizeMax:1.9, colors:[[255,200,110],[255,225,150],[255,180,80]], comet:true },
+    realSilver: { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.028, drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.0, sizeMax:1.8, colors:[[255,255,255],[210,225,255]], comet:true },
+    realRed:    { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.03,  drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.0, sizeMax:1.9, colors:[[255,70,70],[255,120,90]], comet:true },
+    realBlue:   { group:'real', count:150, speedMin:3.6, speedMax:10.5, gravity:0.028, drag:0.965, trailLen:24, lifeMin:60, lifeMax:105, sizeMin:1.0, sizeMax:1.8, colors:[[90,180,255],[120,220,255]], comet:true },
+    // 巨大金银菊（终场专属）：粒子数/绽放半径/尺寸/寿命全面放大，视觉上远超普通菊
+    chrysGoldGiant:   { group:'chrys', count:340, layers:[[9.5,12.5],[6,8],[3.5,5]], gravity:0.04, drag:0.965, trailLen:14, lifeMin:85, lifeMax:155, sizeMin:0.9, sizeMax:2.4, colors:[[255,200,110],[255,225,150],[255,255,210]], multi:false, secondary:true, splitChance:0.42 },
+    chrysSilverGiant: { group:'chrys', count:340, layers:[[9.5,12.5],[6,8],[3.5,5]], gravity:0.04, drag:0.965, trailLen:14, lifeMin:85, lifeMax:155, sizeMin:0.9, sizeMax:2.4, colors:[[255,255,255],[210,225,255],[230,240,255]], multi:false, secondary:true, splitChance:0.42 }
   };
 
   const fwRockets = [], fwParts = [];
@@ -2013,9 +2018,9 @@
   function pickCombo(){
     const r = Math.random();
     let pool, nMax, singleP, doubleP;
-    if(r < 0.55){ pool=['willow','gold','minimal','warm','cool','redgold','violet','longline']; singleP=0.45; doubleP=0.40; nMax=3; }
-    else if(r < 0.75){ pool=['chrysGold','chrysSilver']; singleP=0.40; doubleP=0.60; nMax=2; }  // 菊：双色(金+银)比例高，像红金国风
-    else { pool=['realGold','realSilver','realRed','realBlue']; singleP=0.40; doubleP=0.40; nMax=3; }
+    if(r < 0.68){ pool=['willow','gold','minimal','warm','cool','redgold','violet','longline']; singleP=0.45; doubleP=0.40; nMax=3; }
+    else if(r < 0.88){ pool=['chrysGold','chrysSilver']; singleP=0.40; doubleP=0.60; nMax=2; }  // 菊：双色(金+银)比例高，像红金国风
+    else { pool=['realGold','realSilver','realRed','realBlue']; singleP=0.40; doubleP=0.40; nMax=3; }  // 真实彗星概率由 25% 降至 12%
     const rr = Math.random();
     let n = 1;
     if(nMax>=3 && rr>singleP+doubleP) n = 3;
@@ -2025,11 +2030,13 @@
     return combo;
   }
 
-  function fwLaunch(combo){
+  function fwLaunch(combo, center){
     const first = FW[combo[0]];
-    const sx = fwRnd(W*0.15, W*0.85);
-    const ty = fwRnd(H*0.12, H*0.45);
-    fwRockets.push({ x:sx, y:H+8, vx:fwRnd(-1,1), vy:-fwRnd(9,12.5), ty, color:fwPick(first.colors), hist:[], combo });
+    const sx = center ? W*0.5 : fwRnd(W*0.15, W*0.85);     // 巨大金银菊居中释放，普通烟花随机
+    const ty = center ? H*0.45 : fwRnd(H*0.12, H*0.45);
+    // 巨大金银菊(center)火箭上升速度放慢（释放速度放慢），普通烟花保持原速
+    const vy = center ? -fwRnd(7,9) : -fwRnd(9,12.5);
+    fwRockets.push({ x:sx, y:H+8, vx:fwRnd(-1,1), vy, ty, color:fwPick(first.colors), hist:[], combo });
   }
 
   function fwExplode(x, y, combo){
@@ -2079,7 +2086,7 @@
       p.vx*=p.drag; p.vy*=p.drag; p.vy+=p.gravity; p.x+=p.vx; p.y+=p.vy;
       if(p.split && !p.didSplit && p.life<=p.splitLife){
         const fn=5+(Math.random()*4|0);
-        for(let j=0;j<fn;j++){ const a2=fwRnd(0,Math.PI*2), s2=fwRnd(1,2.6), l2=fwRnd(24,44); fwParts.push({x:p.x,y:p.y,vx:Math.cos(a2)*s2,vy:Math.sin(a2)*s2,life:l2,maxLife:l2,color:p.color,size:fwRnd(0.4,0.9),flick:true,split:false,didSplit:false,hist:[],comet:p.comet,trailLen:p.trailLen,gravity:0.05,drag:0.95}); }
+        for(let j=0;j<fn;j++){ const a2=fwRnd(0,Math.PI*2), s2=fwRnd(1,2.6), l2=fwRnd(30,52); fwParts.push({x:p.x,y:p.y,vx:Math.cos(a2)*s2,vy:Math.sin(a2)*s2,life:l2,maxLife:l2,color:p.color,size:fwRnd(0.4,0.9),flick:true,split:false,didSplit:false,hist:[],comet:p.comet,trailLen:p.trailLen,gravity:0.05,drag:0.95}); }
         p.didSplit=true; fwParts.splice(i,1); continue;
       }
       p.life--; if(p.life<=0){ fwParts.splice(i,1); continue; }
@@ -2092,13 +2099,13 @@
   }
 
   function fwAutoFire(){
-    if(!fwActive) return;
+    if(!fwActive || fwPhase !== 1) return;        // 仅普通阶段发射；进入终场巨大金银菊阶段后自动停（期间禁其它烟花）
     const burst = 1 + (Math.random()<0.4?1:0);   // 偶发双发
     for(let k=0;k<burst;k++) fwLaunch(pickCombo());
-    setTimeout(fwAutoFire, fwRnd(650,1300));      // 稀疏：时不时来几朵
+    fwAutoTimer = setTimeout(fwAutoFire, fwRnd(650,1300));      // 稀疏：时不时来几朵
   }
 
-  let fwEndTimer = null, fwAutoReform = false;
+  let fwEndTimer = null, fwAutoReform = false, fwPhase = 0, fwAutoTimer = null, fwGiantTimer = null;
 
   // 颜色复位为初始（白顶粉底渐变）：关掉纯色、清 colorTouched，所有在场粒子/球型贴图同步
   function resetInitialColor(){
@@ -2111,22 +2118,43 @@
   // 夜空结束：停发烟花 → 颜色复位为初始 → 自动切割 → 置位「落定后自动重聚」
   function endNight(){
     if (!fwActive) return;
-    fwActive = false;
+    fwActive = false; fwPhase = 0;
     if (fwEndTimer) { clearTimeout(fwEndTimer); fwEndTimer = null; }
+    if (fwGiantTimer) { clearTimeout(fwGiantTimer); fwGiantTimer = null; }
+    if (fwAutoTimer) { clearTimeout(fwAutoTimer); fwAutoTimer = null; }
     fwRockets.length = 0; fwParts.length = 0;          // 清场，干净交接到爱心切割
     resetInitialColor();
     if (!scattered && heartReady) { scatter(0, 0); fwAutoReform = true; }   // 自动切割，随后自动重聚
   }
 
+  // 终场巨大金银菊：普通烟花放约 20s 后触发，单独释放一朵巨型金/银菊，期间禁止其它烟花；
+  //   其升空+绽放约 5s 后由 endNight 收尾（自动切割爱心），实现「只有释放完巨大金银菊才可切割」。
+  function startGiant(){
+    if(!fwActive || fwPhase !== 1) return;
+    fwPhase = 2;                                       // 进入终场阶段
+    if(fwAutoTimer){ clearTimeout(fwAutoTimer); fwAutoTimer = null; }          // 停掉普通烟花连发
+    if(fwGiantTimer){ clearTimeout(fwGiantTimer); fwGiantTimer = null; }
+    const big = Math.random() < 0.5 ? 'chrysGoldGiant' : 'chrysSilverGiant';  // 随机金菊或银菊
+    fwLaunch([big], true);                             // 单独释放一朵巨大金银菊（屏幕正中央）
+    fwGiantPoll();                                    // 轮询：升空+绽放+花瓣分裂的小烟花全部消失后才允许切割
+  }
+  // 终场轮询：巨大金银菊升空→绽放→花瓣分裂的小烟花彻底释放完（fwRockets/fwParts 皆空）→ 才结束并切割爱心
+  function fwGiantPoll(){
+    if(!fwActive || fwPhase !== 2) return;            // 已结束或异常 → 退出
+    if(fwRockets.length === 0 && fwParts.length === 0){ endNight(); return; }  // 全部放完（含小烟花）→ 才开始切割
+    fwGiantTimer = setTimeout(fwGiantPoll, 250);       // 否则继续等（每 250ms 检查一次）
+  }
   // 颜色切黑 → 夜空模式：SOLID（纯色模式）且纯色接近黑时开启，否则关闭
   function fwCheckNight(){
     const on = SOLID && Math.max(COL_SOLID.r, COL_SOLID.g, COL_SOLID.b) < 28;
     if (on && !fwActive) {
-      fwActive = true;
+      fwActive = true; fwPhase = 1;                    // 普通烟花阶段
+      if (fwEndTimer) { clearTimeout(fwEndTimer); fwEndTimer = null; }
+      if (fwGiantTimer) { clearTimeout(fwGiantTimer); fwGiantTimer = null; }
       fwAutoFire();
-      fwEndTimer = setTimeout(endNight, 12000);        // 约 12 秒后自动结束 → 切割+复位+重聚
+      fwGiantTimer = setTimeout(startGiant, 20000);    // 约 20s 普通烟花后放巨大金银菊；总时长≈25s
     } else if (!on && fwActive) {
-      endNight();                                      // 手动切回非黑：同样走结束流程
+      endNight();                                      // 手动切回非黑：提前结束（主动退出，属例外）
     }
   }
   colSolid.addEventListener('input', fwCheckNight);
