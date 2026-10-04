@@ -1743,6 +1743,7 @@
   let openSeen = false;             // 本轮是否已出现过张开（张开 → 握拳 = 重聚）
   let handGone = 0;                 // 连续无手帧计数：短暂跟踪丢失不重置哨兵（快速换手势时防误清）
   let peaceHold = 0;                // 比耶连续保持帧数：需保持约 5 帧才触发（过滤握拳→张开过渡态）
+  let openHold = 0;                 // 张开连续保持帧数：需保持约 5 帧才切割（防比耶偶发误判为全开）
   let handVideo = null, handStream = null, hands = null;
   const gestureBtn = document.getElementById('gestureBtn');
   gestureBtn.title = '握拳 → 张开：散开　|　张开 → 握拳：重聚　|　比耶 ✌：一阵流星雨';
@@ -1829,8 +1830,9 @@
     const w = lm[0];
     const dW = n => Math.hypot(lm[n].x - w.x, lm[n].y - w.y);
     const ext = n => dW(n) > dW(n - 2) * 1.05;
+    const open = n => dW(n) > dW(n - 2) * 1.15;          // 无名指/小指更严阈值：比耶的松弛手指不会被算成全开
     const thumbUp = dW(4) > dW(3) * 1.05;
-    return ext(8) && ext(12) && ext(16) && ext(20) && thumbUp;
+    return ext(8) && ext(12) && open(16) && open(20) && thumbUp;
   }
 
   // 握拳 =「四指弯曲」：食指必弯，中/无名/小指最多一根伸直（容一根略松，如小指）。
@@ -1853,7 +1855,7 @@
     const lm = res.multiHandLandmarks[0];
     // 比耶 ✌ 优先：需连续保持约 5 帧才触发（握拳→张开过渡态一晃而过、凑不满帧数），防连发靠 meteorCool
     if (checkPeace(lm)) {
-      peaceHold++;
+      peaceHold++; openHold = 0;
       if (peaceHold >= 5 && meteorCool <= 0) {
         meteorTrigger(Math.random() < 0.5 ? 'minimal' : 'warm');
         meteorCool = 60;
@@ -1861,17 +1863,17 @@
       }
     // 握拳→张开=散开，张开→握拳=重聚。每次到位都「消费上一个哨兵 + 置位自己的哨兵」，持续同一姿势不重复触发。
     } else if (checkFist(lm)) {
-      peaceHold = 0;
+      peaceHold = 0; openHold = 0;
       // 张开 → 握拳：复原。需碎片已落定（与点击复原同一条件），未落定时握拳先不生效
       if (openSeen && scattered && allSettled()) { reform(); handCool = 10; }   // 重聚：仅让路 0.17s，比耶几乎立刻可用；散开的 45 帧保留防卡顿
       openSeen = false; fistSeen = true;
     } else if (checkOpenHand(lm)) {
-      peaceHold = 0;
-      // 握拳 → 张开：散开（效果同切割，全局触发，不要求划过爱心）
-      if (fistSeen && heartReady && !scattered) { scatter(0, 0); handCool = 45; }  // 爆炸：识别让路约 0.75s
+      peaceHold = 0; openHold++;
+      // 张开需连续保持约 5 帧才切割：防比耶偶发被读成全开时的单帧抖动误切（与比耶 peaceHold 对称）
+      if (openHold >= 5 && fistSeen && heartReady && !scattered) { scatter(0, 0); handCool = 45; }  // 爆炸：识别让路约 0.75s
       fistSeen = false; openSeen = true;
     } else {
-      peaceHold = 0;
+      peaceHold = 0; openHold = 0;
     }
   }
   // 识别循环：先排下一帧（保证 send 挂起也不会卡死循环），再用「忙标志」串行化。
@@ -1880,21 +1882,21 @@
   //   旧版用 await 天然串行所以没事；改非阻塞后必须补回这个「一次只送一张」的约束。
   let handBusy = false;
   let handCool = 0;                                      // 识别冷却帧数：手势触发爆炸后短暂让路，算力全给爆炸动画
-  let lastHandSend = 0;                                  // 识别节流时间戳：控制送帧频率，给粒子渲染让出算力
+  let handTimer = null;                                  // setTimeout 调度句柄：低频驱动识别，避免高刷屏每帧抢占主线程
+  // 频率策略：用 setTimeout 链式调度（而非 requestAnimationFrame）。rAF 会跟着屏幕刷新率跑（手机 90/120Hz），
+  //   每帧都唤醒循环，而 MediaPipe 的 WASM 推理在主线程同步执行（每张几十 ms），周期性占用主线程会把渲染帧挤掉 → 卡顿。
+  //   改 setTimeout 后：每次 send 完成才排下一帧 + 间隔 70ms（≈14fps），低分辨率下单帧推理仅 ~10ms，主线程占用大幅降低；
+  //   手势是慢变化姿态，14fps 足够，响应延迟仅增约百 ms（人眼无感），不影响灵敏度阈值。
+  const HAND_INTERVAL = 70;                              // 两次识别最小间隔(ms) ≈ 14fps
   function handSendLoop() {
-    if (!handEnabled || !hands || !handVideo) return;
-    requestAnimationFrame(handSendLoop);                 // 先排下一帧
-    if (handCool > 0) { handCool--; return; }            // 冷却期内不发图（爆炸瞬间让路，手感无影响：动作已完成）
-    if (handBusy) return;                                // 上一张还没处理完 → 本帧跳过（关键：防堆积）
-    // 节流：每 ~45ms（≈22fps）才送一帧给 MediaPipe。手势是慢变化姿态，无需 60fps 识别；
-    //   全速 send 会把 WASM 识别算力占满，挤掉粒子渲染帧 → 肉眼可见卡顿。降频后渲染恢复流畅，
-    //   手势响应延迟仅增几十 ms（人眼无感）。不影响灵敏度阈值。
-    if (performance.now() - lastHandSend < 45) return;
-    lastHandSend = performance.now();
+    if (!handEnabled || !hands || !handVideo) { handTimer = null; return; }
+    if (handCool > 0) { handCool--; handTimer = setTimeout(handSendLoop, 16); return; }   // 冷却期短间隔空转
+    if (handBusy)    { handTimer = setTimeout(handSendLoop, 16); return; }                // 上一张未处理完 → 稍后再探（防堆积）
     if (handVideo.readyState >= 2) {
       handBusy = true;
       hands.send({ image: handVideo }).then(() => {
-        handBusy = false;                                // 成功 → 解锁
+        handBusy = false;
+        handTimer = setTimeout(handSendLoop, HAND_INTERVAL);   // 成功 → 间隔后发下一帧
       }, e => {
         // WASM 堆越界属不可恢复错误：停掉识别并复位按钮，避免「看着是开启、实则已死」的欺骗状态
         if (/memory access out of bounds|out of memory/i.test(String(e && e.message || e))) {
@@ -1902,8 +1904,11 @@
           gestureBtn.classList.remove('on');
           gestureBtn.textContent = '手势（异常，可重开）';
         }
-        handBusy = false;                                // 失败 → 也解锁（不用 .finally，兼容老浏览器）
+        handBusy = false;
+        handTimer = setTimeout(handSendLoop, HAND_INTERVAL);   // 失败 → 也解锁并重排
       });
+    } else {
+      handTimer = setTimeout(handSendLoop, 16);
     }
   }
   function loadScript(src) {
@@ -1941,7 +1946,9 @@
       // 分辨率上限 640×480：手机默认可能给 1080p，帧数据过大会撑爆 MediaPipe 的 WASM 堆
       //   （报错 memory access out of bounds）。识别本身也不需要高分辨率。
       handStream = await withTimeout(navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 480, max: 640 }, height: { ideal: 360, max: 480 } },
+        // 识别只需手部轮廓，320×240 足够且大幅降低单帧 WASM 推理耗时（高分辨率是卡顿主因之一）；
+        //   max 硬性封顶，防止手机默认给 1080p 撑爆 WASM 堆。不影响识别准确率。
+        video: { facingMode: 'user', width: { ideal: 320, max: 320 }, height: { ideal: 240, max: 240 } },
         audio: false
       }), 8000, '摄像头请求超时');
       handVideo.srcObject = handStream;
@@ -1961,7 +1968,8 @@
     }
   }
   function disableGesture() {
-    handEnabled = false; handReady = false; fistSeen = false; openSeen = false; handGone = 0; peaceHold = 0; handBusy = false; handCool = 0;
+    if (handTimer) { clearTimeout(handTimer); handTimer = null; }   // 停掉低频识别定时器，避免残留循环继续占算力
+    handEnabled = false; handReady = false; fistSeen = false; openSeen = false; handGone = 0; peaceHold = 0; openHold = 0; handBusy = false; handCool = 0;
     if (hands && hands.close) { try { hands.close(); } catch (_) {} }
     hands = null;
     if (handStream) { handStream.getTracks().forEach(t => t.stop()); handStream = null; }
