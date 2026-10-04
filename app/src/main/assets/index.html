@@ -1872,8 +1872,8 @@
     } else if (checkOpenHand(lm)) {
       peaceHold = 0; openHold++;
       // 张开需连续保持约 5 帧才切割：防比耶偶发被读成全开时的单帧抖动误切（与比耶 peaceHold 对称）
-      if (openHold >= 5 && fistSeen && heartReady && !scattered) { scatter(0, 0); handCool = 45; }  // 爆炸：识别让路约 0.75s
-      fistSeen = false; openSeen = true;
+      if (openHold >= 5 && fistSeen && heartReady && !scattered) { scatter(0, 0); handCool = 45; fistSeen = false; }  // 爆炸：触发时才消费握拳哨兵（fistSeen 需撑满5帧）
+      openSeen = true;
     } else {
       peaceHold = 0; openHold = 0;
     }
