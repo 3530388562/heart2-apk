@@ -1742,7 +1742,7 @@
   let fistSeen = false;             // 本轮是否已出现过握拳（握拳 → 张开 = 散开）
   let openSeen = false;             // 本轮是否已出现过张开（张开 → 握拳 = 重聚）
   let handGone = 0;                 // 连续无手帧计数：短暂跟踪丢失不重置哨兵（快速换手势时防误清）
-  let peaceHold = 0;                // 比耶连续保持帧数：需保持约 5 帧才触发（过滤握拳→张开过渡态）
+  let peaceHold = 0;                // 比耶连续保持帧数：需保持约 3 帧才触发（过滤握拳→张开过渡态）
   let openHold = 0;                 // 张开连续保持帧数：需保持约 5 帧才切割（防比耶偶发误判为全开）
   let handVideo = null, handStream = null, hands = null;
   const gestureBtn = document.getElementById('gestureBtn');
@@ -1858,7 +1858,7 @@
     // 比耶 ✌ 优先：需连续保持约 5 帧才触发（握拳→张开过渡态一晃而过、凑不满帧数），防连发靠 meteorCool
     if (checkPeace(lm)) {
       peaceHold++; openHold = 0;
-      if (peaceHold >= 5 && meteorCool <= 0) {
+      if (peaceHold >= 3 && meteorCool <= 0) {
         meteorTrigger(Math.random() < 0.5 ? 'minimal' : 'warm');
         meteorCool = 60;
         peaceHold = 0;   // 触发后归零：必须「松开再比耶」才会再放一阵，长按不连发
@@ -1871,8 +1871,9 @@
       openSeen = false; fistSeen = true;
     } else if (checkOpenHand(lm)) {
       peaceHold = 0; openHold++;
-      // 张开需连续保持约 5 帧才切割：防比耶偶发被读成全开时的单帧抖动误切（与比耶 peaceHold 对称）
-      if (openHold >= 5 && fistSeen && heartReady && !scattered) { scatter(0, 0); handCool = 45; fistSeen = false; }  // 爆炸：触发时才消费握拳哨兵（fistSeen 需撑满5帧）
+      // 张开判定：已握拳(fistSeen)时单帧触发快速通道，否则需保持约 3 帧才切割：防比耶偶发被读成全开时的抖动误切
+      const openNeed = fistSeen ? 1 : 3;   // 已握拳前提下张开 → 快速通道：单帧即触发（fistSeen 上下文保证是用户意图）；否则保持3帧严格守卫防误切
+      if (openHold >= openNeed && fistSeen && heartReady && !scattered) { scatter(0, 0); handCool = 45; fistSeen = false; }  // 爆炸：触发时才消费握拳哨兵
       openSeen = true;
     } else {
       peaceHold = 0; openHold = 0;
@@ -1889,7 +1890,8 @@
   //   每帧都唤醒循环，而 MediaPipe 的 WASM 推理在主线程同步执行（每张几十 ms），周期性占用主线程会把渲染帧挤掉 → 卡顿。
   //   改 setTimeout 后：每次 send 完成才排下一帧 + 间隔 70ms（≈14fps），低分辨率下单帧推理仅 ~10ms，主线程占用大幅降低；
   //   手势是慢变化姿态，14fps 足够，响应延迟仅增约百 ms（人眼无感），不影响灵敏度阈值。
-  const HAND_INTERVAL = 70;                              // 两次识别最小间隔(ms) ≈ 14fps
+  const HAND_INTERVAL = 70;                              // 两次识别最小间隔(ms) ≈ 14fps（常态，保流畅度红线）
+  const HAND_INTERVAL_FAST = 35;                         // 已握拳后加速到 ≈28fps，开辟「快速识别张开」临时通道
   function handSendLoop() {
     if (!handEnabled || !hands || !handVideo) { handTimer = null; return; }
     if (handCool > 0) { handCool--; handTimer = setTimeout(handSendLoop, 16); return; }   // 冷却期短间隔空转
@@ -1898,7 +1900,7 @@
       handBusy = true;
       hands.send({ image: handVideo }).then(() => {
         handBusy = false;
-        handTimer = setTimeout(handSendLoop, HAND_INTERVAL);   // 成功 → 间隔后发下一帧
+        handTimer = setTimeout(handSendLoop, fistSeen ? HAND_INTERVAL_FAST : HAND_INTERVAL);   // 成功 → 间隔后发下一帧
       }, e => {
         // WASM 堆越界属不可恢复错误：停掉识别并复位按钮，避免「看着是开启、实则已死」的欺骗状态
         if (/memory access out of bounds|out of memory/i.test(String(e && e.message || e))) {
@@ -1907,7 +1909,7 @@
           gestureBtn.textContent = '手势（异常，可重开）';
         }
         handBusy = false;
-        handTimer = setTimeout(handSendLoop, HAND_INTERVAL);   // 失败 → 也解锁并重排
+        handTimer = setTimeout(handSendLoop, fistSeen ? HAND_INTERVAL_FAST : HAND_INTERVAL);   // 失败 → 也解锁并重排
       });
     } else {
       handTimer = setTimeout(handSendLoop, 16);
